@@ -38,10 +38,22 @@ function drawCoin(ctx: Ctx, shine: number | null): void {
   const face = ellipsePath(cx, cy, rx, ry, 48);
   const rim = ellipsePath(cx, cy + th, rx, ry, 48);
   // Обод: нижняя половина «таблетки».
-  const body: Path = [...ellipsePath(cx, cy, rx, ry, 48).filter((p) => p.y <= cy), ...ellipsePath(cx, cy + th, rx, ry, 48).filter((p) => p.y > cy + th)];
+  const body: Path = [
+    ...ellipsePath(cx, cy, rx, ry, 48).filter((p) => p.y <= cy),
+    ...ellipsePath(cx, cy + th, rx, ry, 48).filter((p) => p.y > cy + th),
+  ];
   body.sort((a, b) => Math.atan2(a.y - cy - th / 2, a.x - cx) - Math.atan2(b.y - cy - th / 2, b.x - cx));
   fillPath(ctx, rim, shiftHex(palette.gold.shadow, 0.9, 4));
-  fillPath(ctx, [{ x: cx - rx, y: cy }, { x: cx + rx, y: cy }, { x: cx + rx, y: cy + th }, { x: cx - rx, y: cy + th }], shiftHex(palette.gold.shadow, 0.9, 4));
+  fillPath(
+    ctx,
+    [
+      { x: cx - rx, y: cy },
+      { x: cx + rx, y: cy },
+      { x: cx + rx, y: cy + th },
+      { x: cx - rx, y: cy + th },
+    ],
+    shiftHex(palette.gold.shadow, 0.9, 4),
+  );
   // Насечка на ребре.
   ctx.save();
   ctx.beginPath();
@@ -50,7 +62,15 @@ function drawCoin(ctx: Ctx, shine: number | null): void {
   ctx.clip();
   for (let a = 0.15; a < Math.PI - 0.1; a += 0.22) {
     const x = cx - Math.cos(a) * rx;
-    line(ctx, [{ x, y: cy + Math.sin(a) * ry * 0.4 + 2 }, { x, y: cy + Math.sin(a) * ry + th - 1 }], 1.4, rgba(palette.gold.engrave, 0.7));
+    line(
+      ctx,
+      [
+        { x, y: cy + Math.sin(a) * ry * 0.4 + 2 },
+        { x, y: cy + Math.sin(a) * ry + th - 1 },
+      ],
+      1.4,
+      rgba(palette.gold.engrave, 0.7),
+    );
   }
   ctx.restore();
   // Лицевая сторона.
@@ -105,7 +125,14 @@ function drawCoin(ctx: Ctx, shine: number | null): void {
     outline.push({ x: cx + Math.cos(a) * rx, y: cy + th + Math.sin(a) * ry });
   }
   ink(ctx, outline, 5);
-  line(ctx, ellipsePath(cx, cy, rx, ry, 48).filter((p) => p.y >= cy - 0.5).sort((a, b) => a.x - b.x), 2.4, palette.ink);
+  line(
+    ctx,
+    ellipsePath(cx, cy, rx, ry, 48)
+      .filter((p) => p.y >= cy - 0.5)
+      .sort((a, b) => a.x - b.x),
+    2.4,
+    palette.ink,
+  );
   glint(ctx, cx - 11, cy - 7, 6.5);
   glint(ctx, cx - 3, cy - 11, 3.4);
   void body;
@@ -113,7 +140,8 @@ function drawCoin(ctx: Ctx, shine: number | null): void {
 
 export function coinSprites(add: AddSprite): void {
   add(SPR.coin, { w: 60, h: 56, ox: 30, oy: 46, draw: (c) => drawCoin(c, null) });
-  for (let i = 0; i < 5; i++) add(`coin.s${i}`, { w: 60, h: 56, ox: 30, oy: 46, draw: (c) => drawCoin(c, (i + 0.5) / 5) });
+  for (let i = 0; i < 5; i++)
+    add(`coin.s${i}`, { w: 60, h: 56, ox: 30, oy: 46, draw: (c) => drawCoin(c, (i + 0.5) / 5) });
   // Отдельный блик-оверлей (поверх света).
   add(SPR.coinShine, {
     w: 60,
@@ -192,7 +220,11 @@ function drawRuby(ctx: Ctx): void {
     const l = Math.hypot(nx, ny);
     facet(ctx, [a, b, m], toneFor(t, nx / l, ny / l));
     const prevTab = tab[(i + n - 1) % n];
-    facet(ctx, [a, m, prevTab], toneFor(t, (a[0] - cx) / rx, (a[1] - cy) / ry) === t.light ? t.light : t.base);
+    facet(
+      ctx,
+      [a, m, prevTab],
+      toneFor(t, (a[0] - cx) / rx, (a[1] - cy) / ry) === t.light ? t.light : t.base,
+    );
   }
   facet(ctx, tab, t.base);
   // Блик на площадке.
@@ -281,14 +313,20 @@ function drawSapphire(ctx: Ctx): void {
 }
 
 function drawPedestal(ctx: Ctx): void {
-  const stone: Tones = { base: shiftHex(palette.slab.light, 0.92, 4), shadow: palette.slab.shadow, light: shiftHex(palette.slab.light, 1.18, -2) };
+  const stone: Tones = {
+    base: shiftHex(palette.slab.light, 0.92, 4),
+    shadow: palette.slab.shadow,
+    light: shiftHex(palette.slab.light, 1.18, -2),
+  };
   const cx = 38;
   const top = 18;
   const bot = 32;
   const rx = 28;
   const ry = 9;
   const body: Path = [
-    ...ellipsePath(cx, top, rx, ry, 40).filter((p) => p.y <= top + 0.01).sort((a, b) => a.x - b.x),
+    ...ellipsePath(cx, top, rx, ry, 40)
+      .filter((p) => p.y <= top + 0.01)
+      .sort((a, b) => a.x - b.x),
     ...ellipsePath(cx, bot, rx, ry, 40)
       .filter((p) => p.y >= bot - 0.01)
       .sort((a, b) => b.x - a.x),
@@ -301,11 +339,22 @@ function drawPedestal(ctx: Ctx): void {
   ctx.clip();
   ctx.fillStyle = stone.shadow;
   ctx.fillRect(cx + rx * 0.35, 0, rx, 60);
-  halftone(ctx, rgba(palette.ink, 0.5), { region: { x: cx + rx * 0.1, y: top, w: rx, h: bot - top + ry }, spacing: 5, rMin: 0.3, rMax: 2, dir: { x: 1, y: 0 } });
+  halftone(ctx, rgba(palette.ink, 0.5), {
+    region: { x: cx + rx * 0.1, y: top, w: rx, h: bot - top + ry },
+    spacing: 5,
+    rMin: 0.3,
+    rMax: 2,
+    dir: { x: 1, y: 0 },
+  });
   ctx.fillStyle = rgba('#ffffff', 0.18);
   ctx.fillRect(cx - rx, 0, rx * 0.35, 60);
   // Резной поясок.
-  line(ctx, ellipsePath(cx, (top + bot) / 2 + 1, rx, ry, 40).filter((p) => p.y > (top + bot) / 2 + 1), 2, rgba(palette.ink, 0.55));
+  line(
+    ctx,
+    ellipsePath(cx, (top + bot) / 2 + 1, rx, ry, 40).filter((p) => p.y > (top + bot) / 2 + 1),
+    2,
+    rgba(palette.ink, 0.55),
+  );
   ctx.restore();
   const topE = ellipsePath(cx, top, rx, ry, 40);
   celShade(ctx, topE, stone, 3, { lightK: 2 });
@@ -376,10 +425,28 @@ export function miscSprites(add: AddSprite, rng: Rng): void {
       c.restore();
     },
   });
-  add(SPR.dot, { w: 12, h: 12, ox: 6, oy: 6, draw: (c) => fillPath(c, ellipsePath(6, 6, 4.5, 4.5), '#ffffff') });
+  add(SPR.dot, {
+    w: 12,
+    h: 12,
+    ox: 6,
+    oy: 6,
+    draw: (c) => fillPath(c, ellipsePath(6, 6, 4.5, 4.5), '#ffffff'),
+  });
   add(SPR.softDot, { w: 32, h: 32, ox: 16, oy: 16, draw: (c) => radialSpot(c, 16, 16, 15, '#ffffff', 0.9) });
-  add(SPR.ring, { w: 64, h: 64, ox: 32, oy: 32, draw: (c) => line(c, ellipsePath(32, 32, 26, 26), 4, '#ffffff', true) });
-  add(SPR.lightSpot, { w: 128, h: 128, ox: 64, oy: 64, draw: (c) => radialSpot(c, 64, 64, 63, '#ffffff', 0.85) });
+  add(SPR.ring, {
+    w: 64,
+    h: 64,
+    ox: 32,
+    oy: 32,
+    draw: (c) => line(c, ellipsePath(32, 32, 26, 26), 4, '#ffffff', true),
+  });
+  add(SPR.lightSpot, {
+    w: 128,
+    h: 128,
+    ox: 64,
+    oy: 64,
+    draw: (c) => radialSpot(c, 64, 64, 63, '#ffffff', 0.85),
+  });
   add(SPR.rayBurst, {
     w: 200,
     h: 200,

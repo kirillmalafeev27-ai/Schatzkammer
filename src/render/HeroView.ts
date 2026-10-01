@@ -90,7 +90,16 @@ export class HeroView {
     this.sweat = art.img(R.sweat.x, R.sweat.y, H.sweat).setVisible(false);
 
     this.headC.add([this.headImg, this.eyes, this.brows, this.mouth, this.hat, this.sweat]);
-    this.upper.add([this.bag, this.armB, this.torso, this.lantern, this.scarfTail, this.scarf, this.headC, this.armF]);
+    this.upper.add([
+      this.bag,
+      this.armB,
+      this.torso,
+      this.lantern,
+      this.scarfTail,
+      this.scarf,
+      this.headC,
+      this.armF,
+    ]);
     this.body.add([this.legB, this.bootB, this.legF, this.bootF, this.upper]);
     this.pips = scene.add.container(0, R.pips.y);
     this.root.add([this.body]);
@@ -144,7 +153,12 @@ export class HeroView {
         this.art.setFrame(im, want);
         if (i < have && !this.reduced) {
           im.setScale(this.art.baseScale(want) * 1.5);
-          this.scene.tweens.add({ targets: im, scale: this.art.baseScale(want), duration: 220, ease: 'Back.Out' });
+          this.scene.tweens.add({
+            targets: im,
+            scale: this.art.baseScale(want),
+            duration: 220,
+            ease: 'Back.Out',
+          });
         }
       }
     });
@@ -165,7 +179,12 @@ export class HeroView {
     this.art.setFrame(this.bag, SPR.hero.bag[stage]);
     if (!this.reduced) {
       this.bag.setScale(this.art.baseScale(SPR.hero.bag[stage]) * 1.25);
-      this.scene.tweens.add({ targets: this.bag, scale: this.art.baseScale(SPR.hero.bag[stage]), duration: 260, ease: 'Back.Out' });
+      this.scene.tweens.add({
+        targets: this.bag,
+        scale: this.art.baseScale(SPR.hero.bag[stage]),
+        duration: 260,
+        ease: 'Back.Out',
+      });
     }
     this.sweat.setVisible(cost >= balance.anim.sweatFromCost);
   }
@@ -174,7 +193,12 @@ export class HeroView {
     if (m === this.mood) return;
     this.mood = m;
     const H = SPR.hero;
-    const brows = { neutral: H.browsNeutral, worried: H.browsWorried, strain: H.browsStrain, happy: H.browsHappy }[m];
+    const brows = {
+      neutral: H.browsNeutral,
+      worried: H.browsWorried,
+      strain: H.browsStrain,
+      happy: H.browsHappy,
+    }[m];
     const mouth = { neutral: H.mouthSmile, worried: H.mouthFlat, strain: H.mouthGrit, happy: H.mouthOpen }[m];
     this.art.setFrame(this.brows, brows);
     this.art.setFrame(this.mouth, mouth);
@@ -243,7 +267,12 @@ export class HeroView {
   /** Качнуться на месте (тап по препятствию у героя, отказ). */
   shrug(): void {
     if (this.reduced) return;
-    this.scene.tweens.add({ targets: this.headC, angle: { from: -8, to: 0 }, duration: 260, ease: 'Back.Out' });
+    this.scene.tweens.add({
+      targets: this.headC,
+      angle: { from: -8, to: 0 },
+      duration: 260,
+      ease: 'Back.Out',
+    });
   }
 
   celebrate(): void {
@@ -272,7 +301,8 @@ export class HeroView {
     // Моргание раз в 3–5 с.
     if (t >= this.blinkAt) {
       this.blinkUntil = t + 120;
-      this.blinkAt = t + balance.anim.blinkMinMs + this.rng() * (balance.anim.blinkMaxMs - balance.anim.blinkMinMs);
+      this.blinkAt =
+        t + balance.anim.blinkMinMs + this.rng() * (balance.anim.blinkMaxMs - balance.anim.blinkMinMs);
     }
     // Тревога: время от времени оглядывается на дверь.
     let eyes: string = H.eyes;
@@ -306,7 +336,7 @@ export class HeroView {
 
     // Пот.
     if (this.sweat.visible) {
-      const k = ((t / 700) % 1 + 1) % 1;
+      const k = (((t / 700) % 1) + 1) % 1;
       this.sweat.y = R.sweat.y + k * 14;
       this.sweat.alpha = 1 - k;
     }

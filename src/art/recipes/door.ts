@@ -30,8 +30,16 @@ import {
 import { SPR } from '../manifest';
 import { INK } from './common';
 
-const DOOR: Tones = { base: palette.doorStone.base, shadow: palette.doorStone.shadow, light: palette.doorStone.light };
-const BRONZE: Tones = { base: palette.bronze.base, shadow: palette.bronze.shadow, light: palette.bronze.light };
+const DOOR: Tones = {
+  base: palette.doorStone.base,
+  shadow: palette.doorStone.shadow,
+  light: palette.doorStone.light,
+};
+const BRONZE: Tones = {
+  base: palette.bronze.base,
+  shadow: palette.bronze.shadow,
+  light: palette.bronze.light,
+};
 const IRON: Tones = { base: palette.iron, shadow: palette.ironDark, light: palette.ironLight };
 
 const SLAB_W = 108;
@@ -46,7 +54,13 @@ function slab(ctx: Ctx, rng: Rng): void {
   ctx.restore();
   // Рамка-бордюр рельефом.
   const inner = roughRect(rng, 12, 12, SLAB_W - 24, SLAB_H - 24, 3, 0.8);
-  line(ctx, inner.map((q) => ({ x: q.x + 1.5, y: q.y + 1.5 })), 3, rgba('#ffffff', 0.3), true);
+  line(
+    ctx,
+    inner.map((q) => ({ x: q.x + 1.5, y: q.y + 1.5 })),
+    3,
+    rgba('#ffffff', 0.3),
+    true,
+  );
   line(ctx, inner, 3, rgba(palette.ink, 0.6), true);
   // Солнце: круг, лучи.
   const cx = SLAB_W / 2;
@@ -67,9 +81,35 @@ function slab(ctx: Ctx, rng: Rng): void {
   celShade(ctx, disc, BRONZE, 4);
   line(ctx, ellipsePath(cx, cy, 13, 13), 2, rgba(palette.ink, 0.6), true);
   // Лицо солнца.
-  line(ctx, [{ x: cx - 7, y: cy - 3 }, { x: cx - 3, y: cy - 4 }], 2.2, palette.ink);
-  line(ctx, [{ x: cx + 3, y: cy - 4 }, { x: cx + 7, y: cy - 3 }], 2.2, palette.ink);
-  brush(ctx, [{ x: cx - 6, y: cy + 5 }, { x: cx, y: cy + 8 }, { x: cx + 6, y: cy + 5 }], 2.4, palette.ink, 0.5);
+  line(
+    ctx,
+    [
+      { x: cx - 7, y: cy - 3 },
+      { x: cx - 3, y: cy - 4 },
+    ],
+    2.2,
+    palette.ink,
+  );
+  line(
+    ctx,
+    [
+      { x: cx + 3, y: cy - 4 },
+      { x: cx + 7, y: cy - 3 },
+    ],
+    2.2,
+    palette.ink,
+  );
+  brush(
+    ctx,
+    [
+      { x: cx - 6, y: cy + 5 },
+      { x: cx, y: cy + 8 },
+      { x: cx + 6, y: cy + 5 },
+    ],
+    2.4,
+    palette.ink,
+    0.5,
+  );
   ink(ctx, disc, 3.4);
   glint(ctx, cx - 9, cy - 9, 4);
   // Латунные заклёпки по углам.
@@ -88,19 +128,47 @@ function slab(ctx: Ctx, rng: Rng): void {
   for (let i = 0; i < 4; i++) {
     const x = 26 + i * 18.5;
     const y = 40;
-    line(ctx, [{ x: x - 4, y: y - 5 }, { x: x + 4, y: y + 5 }], 2.2, rgba(palette.ink, 0.55));
-    line(ctx, [{ x: x + 4, y: y - 5 }, { x: x - 4, y: y + 5 }], 2.2, rgba(palette.ink, 0.55));
+    line(
+      ctx,
+      [
+        { x: x - 4, y: y - 5 },
+        { x: x + 4, y: y + 5 },
+      ],
+      2.2,
+      rgba(palette.ink, 0.55),
+    );
+    line(
+      ctx,
+      [
+        { x: x + 4, y: y - 5 },
+        { x: x - 4, y: y + 5 },
+      ],
+      2.2,
+      rgba(palette.ink, 0.55),
+    );
   }
   crack(ctx, rng, { x: 18 + rng() * 20, y: SLAB_H - 8 }, 46, -Math.PI / 2 + 0.4, 1.8);
   // Нижняя кромка темнее — край, который скребёт по полу.
-  line(ctx, [{ x: 4, y: SLAB_H - 5 }, { x: SLAB_W - 4, y: SLAB_H - 5 }], 4, rgba(palette.ink, 0.5));
+  line(
+    ctx,
+    [
+      { x: 4, y: SLAB_H - 5 },
+      { x: SLAB_W - 4, y: SLAB_H - 5 },
+    ],
+    4,
+    rgba(palette.ink, 0.5),
+  );
   ink(ctx, p, INK - 1);
 }
 
 function framePillar(ctx: Ctx, rng: Rng, flip: boolean): void {
   const W = 34;
   const H = 210;
-  const tones: Tones = { base: shiftHex(DOOR.base, 0.84, 6), shadow: shiftHex(DOOR.shadow, 0.85, 8), light: shiftHex(DOOR.light, 0.92, 4) };
+  const tones: Tones = {
+    base: shiftHex(DOOR.base, 0.84, 6),
+    shadow: shiftHex(DOOR.shadow, 0.85, 8),
+    light: shiftHex(DOOR.light, 0.92, 4),
+  };
   const p = roughRect(rng, 3, 2, W - 6, H - 4, 3, 1);
   fillPath(ctx, p, tones.base);
   ctx.save();
@@ -112,11 +180,33 @@ function framePillar(ctx: Ctx, rng: Rng, flip: boolean): void {
   ctx.fillRect(flip ? W - 10 : 0, 0, 10, H);
   ctx.fillStyle = tones.shadow;
   ctx.fillRect(flip ? 0 : W - 11, 0, 11, H);
-  halftone(ctx, rgba(palette.ink, 0.5), { region: { x: flip ? 0 : W - 14, y: 0, w: 14, h: H }, spacing: 5, rMin: 0.3, rMax: 2, dir: { x: flip ? -1 : 1, y: 0 } });
+  halftone(ctx, rgba(palette.ink, 0.5), {
+    region: { x: flip ? 0 : W - 14, y: 0, w: 14, h: H },
+    spacing: 5,
+    rMin: 0.3,
+    rMax: 2,
+    dir: { x: flip ? -1 : 1, y: 0 },
+  });
   // Кольца-пояски.
   for (const y of [30, 70, 110, 150, 190]) {
-    line(ctx, [{ x: 0, y: y + 1.5 }, { x: W, y: y + 1.5 }], 2.4, rgba('#ffffff', 0.22));
-    line(ctx, [{ x: 0, y }, { x: W, y }], 2.6, rgba(palette.ink, 0.65));
+    line(
+      ctx,
+      [
+        { x: 0, y: y + 1.5 },
+        { x: W, y: y + 1.5 },
+      ],
+      2.4,
+      rgba('#ffffff', 0.22),
+    );
+    line(
+      ctx,
+      [
+        { x: 0, y },
+        { x: W, y },
+      ],
+      2.6,
+      rgba(palette.ink, 0.65),
+    );
   }
   ctx.restore();
   ink(ctx, p, 5.5);
@@ -133,7 +223,12 @@ function lintel(ctx: Ctx, rng: Rng): void {
   halftone(ctx, rgba(palette.ink, 0.45), { region: bounds(p), spacing: 5, rMin: 0.3, rMax: 2 });
   ctx.restore();
   // Ключевой камень.
-  const key = polyPath([[W / 2 - 14, 2], [W / 2 + 14, 2], [W / 2 + 10, H - 2], [W / 2 - 10, H - 2]]);
+  const key = polyPath([
+    [W / 2 - 14, 2],
+    [W / 2 + 14, 2],
+    [W / 2 + 10, H - 2],
+    [W / 2 - 10, H - 2],
+  ]);
   celShade(ctx, key, { base: DOOR.light, shadow: DOOR.base, light: '#ece2c8' }, 4);
   ink(ctx, key, 4);
   // Ряд глифов.
@@ -162,7 +257,15 @@ function gear(ctx: Ctx): void {
   line(ctx, hub, 2.6, palette.ink, true);
   for (let i = 0; i < 4; i++) {
     const a = (i / 4) * Math.PI * 2 + 0.4;
-    line(ctx, [{ x: cx + Math.cos(a) * 9, y: cy + Math.sin(a) * 9 }, { x: cx + Math.cos(a) * 14, y: cy + Math.sin(a) * 14 }], 2.6, palette.ink);
+    line(
+      ctx,
+      [
+        { x: cx + Math.cos(a) * 9, y: cy + Math.sin(a) * 9 },
+        { x: cx + Math.cos(a) * 14, y: cy + Math.sin(a) * 14 },
+      ],
+      2.6,
+      palette.ink,
+    );
   }
   fillPath(ctx, ellipsePath(cx, cy, 2.4, 2.4), palette.ink);
 }
@@ -171,7 +274,12 @@ function chain(ctx: Ctx): void {
   // Тайл цепи: два звена (вертикальное и ребром), высота 32 — бесшовно по вертикали.
   const link = (y: number, edge: boolean) => {
     if (edge) {
-      const r = polyPath([[6, y], [10, y], [10, y + 16], [6, y + 16]]);
+      const r = polyPath([
+        [6, y],
+        [10, y],
+        [10, y + 16],
+        [6, y + 16],
+      ]);
       fillPath(ctx, r, IRON.shadow);
       line(ctx, r, 2, palette.ink, true);
     } else {
@@ -188,7 +296,9 @@ function chain(ctx: Ctx): void {
 function sky(ctx: Ctx, rng: Rng, late: boolean): void {
   const W = 112;
   const H = 160;
-  const bands = late ? ['#ff7a54', '#ff9a5c', '#ffc07a', '#ffe0a0'] : ['#7fc8ff', '#a9dcff', '#d8efff', '#fff1c9'];
+  const bands = late
+    ? ['#ff7a54', '#ff9a5c', '#ffc07a', '#ffe0a0']
+    : ['#7fc8ff', '#a9dcff', '#d8efff', '#fff1c9'];
   for (let i = 0; i < bands.length; i++) {
     ctx.fillStyle = bands[i];
     ctx.fillRect(0, (H * i) / bands.length, W, H / bands.length + 1);
@@ -208,7 +318,15 @@ function sky(ctx: Ctx, rng: Rng, late: boolean): void {
   fillPath(ctx, ellipsePath(W * 0.62, sy, late ? 20 : 15, late ? 20 : 15), late ? '#fff0b0' : '#ffffff');
   for (let i = 0; i < 10; i++) {
     const a = (i / 10) * Math.PI * 2;
-    line(ctx, [{ x: W * 0.62 + Math.cos(a) * 22, y: sy + Math.sin(a) * 22 }, { x: W * 0.62 + Math.cos(a) * 30, y: sy + Math.sin(a) * 30 }], 2.4, rgba('#ffffff', 0.8));
+    line(
+      ctx,
+      [
+        { x: W * 0.62 + Math.cos(a) * 22, y: sy + Math.sin(a) * 22 },
+        { x: W * 0.62 + Math.cos(a) * 30, y: sy + Math.sin(a) * 30 },
+      ],
+      2.4,
+      rgba('#ffffff', 0.8),
+    );
   }
   // Облако.
   const cl = blob(rng, 44, 14, { cx: W * 0.28, cy: H * 0.22, points: 9 });
@@ -216,19 +334,41 @@ function sky(ctx: Ctx, rng: Rng, late: boolean): void {
   line(ctx, cl, 2, rgba(palette.ink, 0.5), true);
   // Дальние джунгли.
   const far: Path = [{ x: 0, y: H }];
-  for (let x = 0; x <= W; x += 6) far.push({ x, y: H * 0.7 - Math.abs(Math.sin(x * 0.17 + rng())) * 16 - rng() * 6 });
+  for (let x = 0; x <= W; x += 6)
+    far.push({ x, y: H * 0.7 - Math.abs(Math.sin(x * 0.17 + rng())) * 16 - rng() * 6 });
   far.push({ x: W, y: H });
   fillPath(ctx, far, late ? '#8a4a5a' : palette.jungle.far);
   // Ближние джунгли и пальма.
   const near: Path = [{ x: 0, y: H }];
-  for (let x = 0; x <= W; x += 5) near.push({ x, y: H * 0.84 - Math.abs(Math.sin(x * 0.23 + 1.3)) * 14 - rng() * 5 });
+  for (let x = 0; x <= W; x += 5)
+    near.push({ x, y: H * 0.84 - Math.abs(Math.sin(x * 0.23 + 1.3)) * 14 - rng() * 5 });
   near.push({ x: W, y: H });
   fillPath(ctx, near, late ? '#4a2440' : palette.jungle.near);
   const tx = W * 0.2;
-  brush(ctx, [{ x: tx, y: H }, { x: tx + 4, y: H * 0.72 }, { x: tx + 10, y: H * 0.55 }], 6, late ? '#3a1a34' : '#1e3a3c', 0.6);
+  brush(
+    ctx,
+    [
+      { x: tx, y: H },
+      { x: tx + 4, y: H * 0.72 },
+      { x: tx + 10, y: H * 0.55 },
+    ],
+    6,
+    late ? '#3a1a34' : '#1e3a3c',
+    0.6,
+  );
   for (let i = 0; i < 5; i++) {
     const a = -Math.PI + (i / 4) * Math.PI;
-    brush(ctx, [{ x: tx + 10, y: H * 0.55 }, { x: tx + 10 + Math.cos(a) * 16, y: H * 0.55 + Math.sin(a) * 6 - 4 }, { x: tx + 10 + Math.cos(a) * 26, y: H * 0.55 + 8 }], 5, late ? '#3a1a34' : '#1e3a3c', 0.3);
+    brush(
+      ctx,
+      [
+        { x: tx + 10, y: H * 0.55 },
+        { x: tx + 10 + Math.cos(a) * 16, y: H * 0.55 + Math.sin(a) * 6 - 4 },
+        { x: tx + 10 + Math.cos(a) * 26, y: H * 0.55 + 8 },
+      ],
+      5,
+      late ? '#3a1a34' : '#1e3a3c',
+      0.3,
+    );
   }
 }
 
@@ -238,7 +378,15 @@ function rays(ctx: Ctx, rng: Rng): void {
   for (let i = 0; i < 7; i++) {
     const x = 20 + rng() * (W - 40);
     const w = 6 + rng() * 10;
-    fillPath(ctx, polyPath([[x, H], [x + w, H], [x + w * 0.5 + (rng() - 0.5) * 30, 0]]), rgba('#fff6d8', 0.26));
+    fillPath(
+      ctx,
+      polyPath([
+        [x, H],
+        [x + w, H],
+        [x + w * 0.5 + (rng() - 0.5) * 30, 0],
+      ]),
+      rgba('#fff6d8', 0.26),
+    );
   }
 }
 
@@ -247,18 +395,35 @@ function beam(ctx: Ctx): void {
   const W = 220;
   const H = 300;
   const top = 34;
-  const p = polyPath([[W / 2 - top, 0], [W / 2 + top, 0], [W - 8, H], [8, H]]);
+  const p = polyPath([
+    [W / 2 - top, 0],
+    [W / 2 + top, 0],
+    [W - 8, H],
+    [8, H],
+  ]);
   fillPath(ctx, p, rgba('#fff6d8', 0.55));
   ctx.save();
   ctx.beginPath();
   tracePath(ctx, p);
   ctx.clip();
-  halftone(ctx, rgba('#fff6d8', 0.5), { region: { x: 0, y: H * 0.55, w: W, h: H * 0.45 }, spacing: 7, rMin: 2.6, rMax: 0, dir: { x: 0, y: 1 } });
+  halftone(ctx, rgba('#fff6d8', 0.5), {
+    region: { x: 0, y: H * 0.55, w: W, h: H * 0.45 },
+    spacing: 7,
+    rMin: 2.6,
+    rMax: 0,
+    dir: { x: 0, y: 1 },
+  });
   ctx.restore();
   // Растворяется к концу: вычитаем растр.
   ctx.save();
   ctx.globalCompositeOperation = 'destination-out';
-  halftone(ctx, '#000', { region: { x: 0, y: H * 0.6, w: W, h: H * 0.4 }, spacing: 7, rMin: 0, rMax: 4.2, dir: { x: 0, y: 1 } });
+  halftone(ctx, '#000', {
+    region: { x: 0, y: H * 0.6, w: W, h: H * 0.4 },
+    spacing: 7,
+    rMin: 0,
+    rMax: 4.2,
+    dir: { x: 0, y: 1 },
+  });
   ctx.fillStyle = 'rgba(0,0,0,1)';
   ctx.fillRect(0, H - 6, W, 6);
   ctx.restore();
@@ -270,7 +435,12 @@ function hourglassFrame(ctx: Ctx): void {
   const cx = W / 2;
   // Стойки.
   for (const x of [8, W - 8]) {
-    const post = polyPath([[x - 3, 12], [x + 3, 12], [x + 3, H - 12], [x - 3, H - 12]]);
+    const post = polyPath([
+      [x - 3, 12],
+      [x + 3, 12],
+      [x + 3, H - 12],
+      [x - 3, H - 12],
+    ]);
     celShade(ctx, post, BRONZE, 2);
     line(ctx, post, 2.6, palette.ink, true);
   }
@@ -292,7 +462,15 @@ function hourglassFrame(ctx: Ctx): void {
   // Риски по четвертям на верхней колбе.
   for (let q = 1; q < 4; q++) {
     const y = 14 + (q / 4) * ((H - 28) / 2);
-    line(ctx, [{ x: cx + 12, y }, { x: cx + 17, y }], 1.8, palette.ink);
+    line(
+      ctx,
+      [
+        { x: cx + 12, y },
+        { x: cx + 17, y },
+      ],
+      1.8,
+      palette.ink,
+    );
   }
   // Плиты сверху и снизу.
   for (const y of [4, H - 14]) {
@@ -322,15 +500,37 @@ function hourglassSand(ctx: Ctx): void {
   ctx.clip();
   ctx.fillStyle = palette.sand.light;
   ctx.fillRect(0, 0, W * 0.4, H);
-  halftone(ctx, rgba(palette.sand.shadow, 0.9), { region: { x: W * 0.5, y: 0, w: W * 0.5, h: H }, spacing: 3.5, rMin: 0.3, rMax: 1.3, dir: { x: 1, y: 0 } });
+  halftone(ctx, rgba(palette.sand.shadow, 0.9), {
+    region: { x: W * 0.5, y: 0, w: W * 0.5, h: H },
+    spacing: 3.5,
+    rMin: 0.3,
+    rMax: 1.3,
+    dir: { x: 1, y: 0 },
+  });
   ctx.restore();
 }
 
 function hourglassGlass(ctx: Ctx): void {
   const W = 60;
   const H = 96;
-  line(ctx, [{ x: 19, y: 20 }, { x: 22, y: 36 }], 2.6, rgba('#ffffff', 0.75));
-  line(ctx, [{ x: 20, y: 62 }, { x: 22, y: 76 }], 2.6, rgba('#ffffff', 0.6));
+  line(
+    ctx,
+    [
+      { x: 19, y: 20 },
+      { x: 22, y: 36 },
+    ],
+    2.6,
+    rgba('#ffffff', 0.75),
+  );
+  line(
+    ctx,
+    [
+      { x: 20, y: 62 },
+      { x: 22, y: 76 },
+    ],
+    2.6,
+    rgba('#ffffff', 0.6),
+  );
   glint(ctx, 24, 22, 4);
   void W;
   void H;
@@ -338,7 +538,13 @@ function hourglassGlass(ctx: Ctx): void {
 
 export function doorSprites(add: AddSprite, rng: Rng): void {
   const D = SPR.door;
-  add(D.slab, { w: SLAB_W, h: SLAB_H, ox: SLAB_W / 2, oy: 0, draw: (c) => slab(c, mulberry32(Math.floor(rng() * 1e9))) });
+  add(D.slab, {
+    w: SLAB_W,
+    h: SLAB_H,
+    ox: SLAB_W / 2,
+    oy: 0,
+    draw: (c) => slab(c, mulberry32(Math.floor(rng() * 1e9))),
+  });
   add(D.frameL, { w: 34, h: 210, ox: 34, oy: 210, draw: (c) => framePillar(c, mulberry32(11), false) });
   add(D.frameR, { w: 34, h: 210, ox: 0, oy: 210, draw: (c) => framePillar(c, mulberry32(12), true) });
   add(D.lintel, { w: 196, h: 40, ox: 98, oy: 40, draw: (c) => lintel(c, mulberry32(13)) });

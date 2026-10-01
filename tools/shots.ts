@@ -58,7 +58,12 @@ async function playSome(page: Page, steps: number): Promise<void> {
       for (let c = 0; c < n; c++) if (s.items[c]) items.push(c);
       const hx = s.hero % s.g.cols;
       const hy = Math.floor(s.hero / s.g.cols);
-      items.sort((a, b) => Math.abs((a % s.g.cols) - hx) + Math.abs(Math.floor(a / s.g.cols) - hy) - (Math.abs((b % s.g.cols) - hx) + Math.abs(Math.floor(b / s.g.cols) - hy)));
+      items.sort(
+        (a, b) =>
+          Math.abs((a % s.g.cols) - hx) +
+          Math.abs(Math.floor(a / s.g.cols) - hy) -
+          (Math.abs((b % s.g.cols) - hx) + Math.abs(Math.floor(b / s.g.cols) - hy)),
+      );
       if (items.length) await tz(page, 'target', items[0]);
     }
     await tz(page, 'answer', true);
@@ -73,10 +78,16 @@ async function run(): Promise<void> {
   });
   for (const [w, h] of sizes) {
     const dpr = w < 800 ? 2 : 1;
-    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, hasTouch: w < 800 });
+    const ctx = await browser.newContext({
+      viewport: { width: w, height: h },
+      deviceScaleFactor: dpr,
+      hasTouch: w < 800,
+    });
     const page = await ctx.newPage();
     if (scenario !== 'ui') {
-      await page.addInitScript(() => localStorage.setItem('treasury:tutorial', JSON.stringify({ start: true, heavy: true, risk: true })));
+      await page.addInitScript(() =>
+        localStorage.setItem('treasury:tutorial', JSON.stringify({ start: true, heavy: true, risk: true })),
+      );
     }
     const logs: string[] = [];
     page.on('console', (m) => logs.push(`[${m.type()}] ${m.text()}`));
@@ -89,7 +100,8 @@ async function run(): Promise<void> {
     await waitTz(page);
     await page.waitForTimeout(1200);
     const tag = `${w}x${h}`;
-    if (scenario === 'all' || scenario === 'menu') await page.screenshot({ path: `${out}/${tag}-1-menu.png` });
+    if (scenario === 'all' || scenario === 'menu')
+      await page.screenshot({ path: `${out}/${tag}-1-menu.png` });
     if (scenario === 'all' || scenario === 'round') {
       await tz(page, 'start', 1);
       await page.waitForTimeout(700);

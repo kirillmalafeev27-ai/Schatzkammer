@@ -16,17 +16,25 @@ export interface PageLayout {
 
 const BORDER = 4;
 
-export function computeLayout(w: number, h: number, inset = { top: 0, right: 0, bottom: 0, left: 0 }): PageLayout {
+export function computeLayout(
+  w: number,
+  h: number,
+  inset = { top: 0, right: 0, bottom: 0, left: 0 },
+): PageLayout {
   const L = balance.layout;
   const orient: Orient = w / Math.max(1, h) >= L.landscapeRatio ? 'landscape' : 'portrait';
   const gutter = Math.round(Math.min(L.gutterMax, Math.max(L.gutterMin, Math.min(w, h) * 0.016)));
   const iw = w - inset.left - inset.right - gutter * 2;
   const ih = h - inset.top - inset.bottom - gutter * 2;
   if (orient === 'portrait') {
-    const qSize = Math.round(Math.min(L.portraitQuestionMax, Math.max(L.portraitQuestionMin, h * L.portraitQuestionFrac)));
+    const qSize = Math.round(
+      Math.min(L.portraitQuestionMax, Math.max(L.portraitQuestionMin, h * L.portraitQuestionFrac)),
+    );
     return { orient, gutter, qSize, worldW: iw - BORDER * 2, worldH: ih - qSize - gutter - BORDER * 2 };
   }
-  const qSize = Math.round(Math.min(L.landscapeQuestionMax, Math.max(L.landscapeQuestionMin, w * L.landscapeQuestionFrac)));
+  const qSize = Math.round(
+    Math.min(L.landscapeQuestionMax, Math.max(L.landscapeQuestionMin, w * L.landscapeQuestionFrac)),
+  );
   return { orient, gutter, qSize, worldW: iw - qSize - gutter - BORDER * 2, worldH: ih - BORDER * 2 };
 }
 

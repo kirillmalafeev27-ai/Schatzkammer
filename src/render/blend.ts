@@ -12,11 +12,18 @@ export const blend = {
   addKeep: Phaser.BlendModes.ADD as number,
 };
 
-export function registerBlendModes(renderer: Phaser.Renderer.Canvas.CanvasRenderer | Phaser.Renderer.WebGL.WebGLRenderer): void {
+export function registerBlendModes(
+  renderer: Phaser.Renderer.Canvas.CanvasRenderer | Phaser.Renderer.WebGL.WebGLRenderer,
+): void {
   if (!(renderer instanceof Phaser.Renderer.WebGL.WebGLRenderer)) return;
   const gl = renderer.gl;
   const modes = renderer.blendModes as unknown as object[];
-  const make = (func: number[]) => ({ enabled: true, color: [0, 0, 0, 0], equation: [gl.FUNC_ADD, gl.FUNC_ADD], func });
+  const make = (func: number[]) => ({
+    enabled: true,
+    color: [0, 0, 0, 0],
+    equation: [gl.FUNC_ADD, gl.FUNC_ADD],
+    func,
+  });
   modes.push(make([gl.ONE, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE_MINUS_SRC_ALPHA]));
   blend.emissive = modes.length - 1;
   modes.push(make([gl.ONE, gl.ONE, gl.ZERO, gl.ONE]));

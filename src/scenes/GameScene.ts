@@ -20,7 +20,7 @@ import { DEPTH, DoorView } from '../render/DoorView';
 import { cellBase, CELL, worldGeom, type WorldGeom } from '../render/geometry';
 import { HeroView } from '../render/HeroView';
 import { ItemView } from '../render/ItemView';
-import { createLayers, litLayers, type Layers } from '../render/layers';
+import { createLayers, destroyChildren, litLayers, type Layers } from '../render/layers';
 import { ambientRgb, computeLights } from '../render/lights';
 import { PathPreview } from '../render/PathPreview';
 import { SandView } from '../render/SandView';
@@ -157,6 +157,15 @@ export class GameScene extends Phaser.Scene {
 
   // ── Сборка мира ────────────────────────────────────────────────────────────
 
+  /**
+   * Разобрать мир до уничтожения игры: при game.destroy() Phaser сначала уничтожает слои,
+   * а затем список обновления, и TileSprite цепей двери падал, обращаясь к уже мёртвому слою.
+   */
+  dispose(): void {
+    if (!this.layers || !this.sys.isActive()) return;
+    this.teardown();
+  }
+
   private teardown(): void {
     this.unsub?.();
     this.unsub = null;
@@ -166,13 +175,9 @@ export class GameScene extends Phaser.Scene {
     this.path?.destroy();
     this.items?.clear();
     this.sand?.clear();
-    for (const l of [this.layers.bg, this.layers.floor, this.layers.shadows, this.layers.objects, this.layers.atmos]) l.removeAll(true);
+    for (const l of litLayers(this.layers)) destroyChildren(l);
     // В слое 5 живёт прямоугольник вспышки — его не трогаем.
-    const keep = new Set<Phaser.GameObjects.GameObject>();
-    this.layers.overlay.each((c: Phaser.GameObjects.GameObject) => {
-      if (c instanceof Phaser.GameObjects.Rectangle) keep.add(c);
-    });
-    for (const c of [...this.layers.overlay.list]) if (!keep.has(c)) c.destroy();
+    destroyChildren(this.layers.overlay, (c) => c instanceof Phaser.GameObjects.Rectangle);
     this.tweens.killAll();
     this.fallback = [];
     this.vignette = null;
@@ -214,11 +219,16 @@ export class GameScene extends Phaser.Scene {
     this.vignette.setDepth(1e9);
     this.layers.atmos.add(this.vignette);
     for (let i = 0; i < balance.light.maxLights; i++) {
-      const spot = this.art.img(0, 0, SPR.lightSpot).setBlendMode(blend.addKeep).setVisible(false).setDepth(1e8);
+      const spot = this.art
+        .img(0, 0, SPR.lightSpot)
+        .setBlendMode(blend.addKeep)
+        .setVisible(false)
+        .setDepth(1e8);
       this.layers.atmos.add(spot);
       this.fallback.push(spot);
     }
-    for (const v of [this.world, this.door, this.items, this.sand, this.path, this.hero]) v.setReducedMotion(reduced);
+    for (const v of [this.world, this.door, this.items, this.sand, this.path, this.hero])
+      v.setReducedMotion(reduced);
     this.juice.reduced = reduced;
     this.juice.lang = this.bridge.sfxLang();
     this.juice.avoid = () => {
@@ -363,8 +373,14 @@ export class GameScene extends Phaser.Scene {
   private syncHeroPose(s: GameState): void {
     if (!this.hero) return;
     const risk = this.round?.risk();
-    const alarm = s.status === 'playing' && ((risk?.level === 'danger' && s.target !== exitIndex(s.g)) || remainingMs(s) < 10_000);
-    this.hero.setPose({ cost: currentCost(s), ready: awaitingTarget(s) && s.status === 'playing', alarm: !!alarm });
+    const alarm =
+      s.status === 'playing' &&
+      ((risk?.level === 'danger' && s.target !== exitIndex(s.g)) || remainingMs(s) < 10_000);
+    this.hero.setPose({
+      cost: currentCost(s),
+      ready: awaitingTarget(s) && s.status === 'playing',
+      alarm: !!alarm,
+    });
     this.hero.setPips(s.pips, currentCost(s));
   }
 
@@ -435,7 +451,8 @@ export class GameScene extends Phaser.Scene {
         }
         case 'DROPPED': {
           this.dropRoll(e.item);
-          if (!events.some((x) => x.type === 'COST_CHANGED' && x.to < x.from)) this.juice.word('klirr', this.hero.x, this.hero.y - CELL * 0.4);
+          if (!events.some((x) => x.type === 'COST_CHANGED' && x.to < x.from))
+            this.juice.word('klirr', this.hero.x, this.hero.y - CELL * 0.4);
           break;
         }
         case 'SAND_WARN': {
@@ -474,7 +491,12 @@ export class GameScene extends Phaser.Scene {
         case 'ESCAPED': {
           this.hero.celebrate();
           this.hero.pipsContainer.setVisible(false);
-          this.juice.word(e.timeLeftMs < balance.door.narrowEscapeMs ? 'knapp' : 'geschafft', this.geom.door.cx, CELL * 1.6, { lift: 0 });
+          this.juice.word(
+            e.timeLeftMs < balance.door.narrowEscapeMs ? 'knapp' : 'geschafft',
+            this.geom.door.cx,
+            CELL * 1.6,
+            { lift: 0 },
+          );
           break;
         }
         case 'LOCKED_IN': {
@@ -511,7 +533,15 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.juice.flash(palette.white, 260, 0.9);
-    this.tweens.add({ targets: h, y: h.y - CELL * 0.35, scale: 0.55, alpha: 0, duration: 420, ease: 'Quad.In', onComplete: () => this.hero?.setVisible(false) });
+    this.tweens.add({
+      targets: h,
+      y: h.y - CELL * 0.35,
+      scale: 0.55,
+      alpha: 0,
+      duration: 420,
+      ease: 'Quad.In',
+      onComplete: () => this.hero?.setVisible(false),
+    });
   }
 
   private dustAt(x: number, y: number, cost: number): void {
@@ -543,7 +573,10 @@ export class GameScene extends Phaser.Scene {
     const n = big ? 14 : 5;
     for (let i = 0; i < n; i++) {
       const p = this.art.img(o.x + Math.random() * o.w, y, big ? SPR.puff : SPR.sandGrain);
-      const s = (big ? this.art.baseScale(SPR.puff) * (0.5 + Math.random() * 0.6) : this.art.baseScale(SPR.sandGrain)) * 1;
+      const s =
+        (big
+          ? this.art.baseScale(SPR.puff) * (0.5 + Math.random() * 0.6)
+          : this.art.baseScale(SPR.sandGrain)) * 1;
       p.setScale(s);
       p.setDepth(DEPTH.frame + 3);
       this.layers.objects.add(p);
@@ -566,7 +599,15 @@ export class GameScene extends Phaser.Scene {
     const s = this.art.baseScale(SPR.rayBurst);
     r.setScale(s * 0.4).setAlpha(1);
     this.layers.overlay.add(r);
-    this.tweens.add({ targets: r, scale: s * 1.5, alpha: 0, angle: 25, duration: 380, ease: 'Quad.Out', onComplete: () => r.destroy() });
+    this.tweens.add({
+      targets: r,
+      scale: s * 1.5,
+      alpha: 0,
+      angle: 25,
+      duration: 380,
+      ease: 'Quad.Out',
+      onComplete: () => r.destroy(),
+    });
   }
 
   /** Выброшенный предмет вылетает из мешка, катится в трещину и пропадает. */
@@ -614,7 +655,17 @@ export class GameScene extends Phaser.Scene {
       }
     }
     this.bridge.onFrame(dt);
-    if (this.mode === 'none' || !this.geom || !this.hero || !this.door || !this.items || !this.sand || !this.world || !this.path) return;
+    if (
+      this.mode === 'none' ||
+      !this.geom ||
+      !this.hero ||
+      !this.door ||
+      !this.items ||
+      !this.sand ||
+      !this.world ||
+      !this.path
+    )
+      return;
 
     const frozen = this.juice.frozen();
     const wdt = frozen ? 0 : dt;
@@ -630,14 +681,21 @@ export class GameScene extends Phaser.Scene {
 
     this.hero.update(wdt);
     this.items.update(wdt);
-    this.sand.update(wdt);
+    this.sand.update(wdt, this.hero.root);
     this.door.update(wdt);
     const heroCell = s.hero;
     const occupied = (c: number) => c === heroCell || this.items!.has(c) || c === s.target;
     this.world.update(wdt, occupied);
     if (this.mode === 'round' && this.round) {
       const est = s.status === 'playing' ? this.round.risk() : null;
-      this.path.update(dt, est, s.hero, s.status === 'playing' ? s.target : null, this.bridge.trailMode(), this.bridge.trailHints());
+      this.path.update(
+        dt,
+        est,
+        s.hero,
+        s.status === 'playing' ? s.target : null,
+        this.bridge.trailMode(),
+        this.bridge.trailHints(),
+      );
       if (est) this.syncHeroPose(s);
     } else this.path.update(dt, null, s.hero, null, 'none', false);
     this.juice.update(dt);
@@ -681,7 +739,13 @@ export class GameScene extends Phaser.Scene {
       timeMs: this.elapsed,
       torches: this.world.torchPositions(),
       lantern: this.hero.root.visible ? this.hero.lanternPos() : null,
-      door: { x: this.geom.door.cx, floorY: 0, gapFrac: gap, lateFrac: late, beamLen: this.door.beamLength() },
+      door: {
+        x: this.geom.door.cx,
+        floorY: 0,
+        gapFrac: gap,
+        lateFrac: late,
+        beamLen: this.door.beamLength(),
+      },
       hourglass: this.door.hourglassPos(),
       gems: this.items.gemLights(),
       crystals: this.geom.crystals.map((c, i) => ({ x: c.x, y: c.y, phase: i * 2.1 })),
@@ -706,7 +770,10 @@ export class GameScene extends Phaser.Scene {
         return { x: q.x, y: q.y, s: cam.zoom };
       };
       const a = camMatrix(cam).transformPoint(0, 0, { x: 0, y: 0 } as Phaser.Types.Math.Vector2Like);
-      const b = camMatrix(cam).transformPoint(this.geom.floorW, this.geom.floorH, { x: 0, y: 0 } as Phaser.Types.Math.Vector2Like);
+      const b = camMatrix(cam).transformPoint(this.geom.floorW, this.geom.floorH, {
+        x: 0,
+        y: 0,
+      } as Phaser.Types.Math.Vector2Like);
       L.playfield = [a.x, a.y, b.x, b.y];
       L.floorMin = balance.light.floorMinLight * (1 - dark * 0.45);
       const amb = ambientRgb();
@@ -721,7 +788,10 @@ export class GameScene extends Phaser.Scene {
         if (reduced) pulse = 0.6;
         else {
           this.heartbeat = (this.elapsed % 900) / 900;
-          const hb = Math.max(Math.exp(-((this.heartbeat - 0.08) ** 2) / 0.002), 0.7 * Math.exp(-((this.heartbeat - 0.3) ** 2) / 0.002));
+          const hb = Math.max(
+            Math.exp(-((this.heartbeat - 0.08) ** 2) / 0.002),
+            0.7 * Math.exp(-((this.heartbeat - 0.3) ** 2) / 0.002),
+          );
           pulse = hb;
           vStrength += 0.2 * hb;
         }
@@ -762,5 +832,14 @@ export class GameScene extends Phaser.Scene {
         resolve(null);
       }
     });
+  }
+
+  /** Снимок без белой вспышки: ждёт, пока она погаснет, но не дольше maxWaitMs. */
+  async snapshotClean(maxWaitMs = 900): Promise<HTMLImageElement | null> {
+    const t0 = performance.now();
+    while (this.juice?.flashActive() && performance.now() - t0 < maxWaitMs) {
+      await new Promise((r) => setTimeout(r, 40));
+    }
+    return this.snapshot();
   }
 }

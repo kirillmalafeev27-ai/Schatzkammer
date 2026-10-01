@@ -31,7 +31,11 @@ import {
 import { edgeDots, moss, stone, tonesVar } from './common';
 
 const SLAB: Tones = { base: palette.slab.base, shadow: palette.slab.shadow, light: palette.slab.light };
-const THRESHOLD: Tones = { base: palette.doorStone.base, shadow: palette.doorStone.shadow, light: palette.doorStone.light };
+const THRESHOLD: Tones = {
+  base: palette.doorStone.base,
+  shadow: palette.doorStone.shadow,
+  light: palette.doorStone.light,
+};
 /** Редкие «чужие» камни в кладке — холодные и приглушённые, без цветов добычи. */
 const ALT: Tones[] = [
   { base: '#5f6180', shadow: '#3f4062', light: '#8586a6' },
@@ -98,7 +102,15 @@ function puddle(ctx: Ctx, rng: Rng, cx: number, cy: number, s: number): void {
   tracePath(ctx, p);
   ctx.clip();
   fillPath(ctx, translatePath(p, s * 0.07, s * 0.09), shiftHex(palette.slab.shadow, 0.62, 10));
-  line(ctx, [{ x: cx - s * 0.45, y: cy - s * 0.06 }, { x: cx - s * 0.1, y: cy - s * 0.18 }], 2.2, rgba(palette.slab.light, 0.7));
+  line(
+    ctx,
+    [
+      { x: cx - s * 0.45, y: cy - s * 0.06 },
+      { x: cx - s * 0.1, y: cy - s * 0.18 },
+    ],
+    2.2,
+    rgba(palette.slab.light, 0.7),
+  );
   ctx.restore();
   ink(ctx, p, 2.2);
 }
@@ -113,21 +125,43 @@ function mottle(ctx: Ctx, rng: Rng, path: Path, tones: Tones): void {
   const n = 4 + Math.floor(rng() * 4);
   for (let i = 0; i < n; i++) {
     const w = b.w * (0.2 + rng() * 0.35);
-    const blobP = blob(rng, w, w * (0.5 + rng() * 0.5), { cx: b.x + rng() * b.w, cy: b.y + rng() * b.h, points: 8, jitter: 0.25 });
+    const blobP = blob(rng, w, w * (0.5 + rng() * 0.5), {
+      cx: b.x + rng() * b.w,
+      cy: b.y + rng() * b.h,
+      points: 8,
+      jitter: 0.25,
+    });
     fillPath(ctx, blobP, rng() < 0.5 ? rgba(tones.light, 0.22) : rgba(tones.shadow, 0.3));
   }
-  // Поры и крапины.
+  // Поры и крапины — два пути, по одному на цвет.
   const specks = 26 + Math.floor(rng() * 16);
+  const pores = new Path2D();
+  const flecks = new Path2D();
   for (let i = 0; i < specks; i++) {
-    ctx.fillStyle = rng() < 0.6 ? rgba(palette.ink, 0.24) : rgba('#ffffff', 0.15);
-    ctx.beginPath();
-    ctx.arc(b.x + rng() * b.w, b.y + rng() * b.h, 0.7 + rng() * 1.8, 0, Math.PI * 2);
-    ctx.fill();
+    const p = rng() < 0.6 ? pores : flecks;
+    const x = b.x + rng() * b.w;
+    const y = b.y + rng() * b.h;
+    const r = 0.7 + rng() * 1.8;
+    p.moveTo(x + r, y);
+    p.arc(x, y, r, 0, Math.PI * 2);
   }
+  ctx.fillStyle = rgba(palette.ink, 0.24);
+  ctx.fill(pores);
+  ctx.fillStyle = rgba('#ffffff', 0.15);
+  ctx.fill(flecks);
   // Лёгкие волокна камня.
   for (let i = 0; i < 2; i++) {
     const yy = b.y + b.h * (0.2 + rng() * 0.6);
-    brush(ctx, [{ x: b.x + b.w * 0.08, y: yy }, { x: b.x + b.w * 0.45, y: yy + (rng() - 0.5) * 8 }, { x: b.x + b.w * 0.85, y: yy + (rng() - 0.5) * 8 }], 2.4, rgba(palette.ink, 0.12));
+    brush(
+      ctx,
+      [
+        { x: b.x + b.w * 0.08, y: yy },
+        { x: b.x + b.w * 0.45, y: yy + (rng() - 0.5) * 8 },
+        { x: b.x + b.w * 0.85, y: yy + (rng() - 0.5) * 8 },
+      ],
+      2.4,
+      rgba(palette.ink, 0.12),
+    );
   }
   ctx.restore();
 }
@@ -147,7 +181,13 @@ function bevel(ctx: Ctx, path: Path, tones: Tones): void {
 }
 
 /** Одна плита. */
-function slab(ctx: Ctx, rng: Rng, x0: number, y0: number, opts: { threshold: boolean; nearWall: boolean }): void {
+function slab(
+  ctx: Ctx,
+  rng: Rng,
+  x0: number,
+  y0: number,
+  opts: { threshold: boolean; nearWall: boolean },
+): void {
   const inset = 3.5 + rng() * 2.5;
   const lip = 8;
   const family = !opts.threshold && rng() < 0.16 ? ALT[Math.floor(rng() * ALT.length)] : SLAB;
@@ -161,7 +201,13 @@ function slab(ctx: Ctx, rng: Rng, x0: number, y0: number, opts: { threshold: boo
     for (let i = 0; i < 4; i++) {
       const cx = x0 + CELL * (i % 2 ? 0.72 : 0.29) + (rng() - 0.5) * 6;
       const cy = y0 + CELL * (i < 2 ? 0.29 : 0.68) + (rng() - 0.5) * 6;
-      stone(ctx, rng, 48 + rng() * 10, 40 + rng() * 8, tonesVar(rng, family, 0.07, 5), { cx, cy, inkW: 4, specks: 6, flatBottom: 0.1 });
+      stone(ctx, rng, 48 + rng() * 10, 40 + rng() * 8, tonesVar(rng, family, 0.07, 5), {
+        cx,
+        cy,
+        inkW: 4,
+        specks: 6,
+        flatBottom: 0.1,
+      });
     }
     return;
   }
@@ -175,7 +221,13 @@ function slab(ctx: Ctx, rng: Rng, x0: number, y0: number, opts: { threshold: boo
   ctx.beginPath();
   tracePath(ctx, lipPath);
   ctx.clip();
-  halftone(ctx, rgba(palette.ink, 0.5), { region: bounds(lipPath), spacing: 5, rMin: 0.5, rMax: 2, dir: { x: 0.3, y: 1 } });
+  halftone(ctx, rgba(palette.ink, 0.5), {
+    region: bounds(lipPath),
+    spacing: 5,
+    rMin: 0.5,
+    rMax: 2,
+    dir: { x: 0.3, y: 1 },
+  });
   ctx.restore();
   ink(ctx, lipPath, 4.4);
 
@@ -198,8 +250,24 @@ function slab(ctx: Ctx, rng: Rng, x0: number, y0: number, opts: { threshold: boo
     // Порог: стёртая дорожка и резной орнамент.
     fillPath(ctx, ellipsePath(b.x + b.w / 2, b.y + b.h * 0.55, b.w * 0.26, b.h * 0.36), rgba('#ffffff', 0.1));
     for (const yy of [b.y + 12, b.y + b.h - 14]) {
-      line(ctx, [{ x: b.x + 14, y: yy + 1.4 }, { x: b.x + b.w - 14, y: yy + 1.4 }], 2.6, rgba('#ffffff', 0.25));
-      line(ctx, [{ x: b.x + 14, y: yy }, { x: b.x + b.w - 14, y: yy }], 2.6, rgba(palette.ink, 0.5));
+      line(
+        ctx,
+        [
+          { x: b.x + 14, y: yy + 1.4 },
+          { x: b.x + b.w - 14, y: yy + 1.4 },
+        ],
+        2.6,
+        rgba('#ffffff', 0.25),
+      );
+      line(
+        ctx,
+        [
+          { x: b.x + 14, y: yy },
+          { x: b.x + b.w - 14, y: yy },
+        ],
+        2.6,
+        rgba(palette.ink, 0.5),
+      );
     }
   } else if (kindR < 0.17) {
     // Расколотая плита: щель поперёк.
@@ -209,7 +277,11 @@ function slab(ctx: Ctx, rng: Rng, x0: number, y0: number, opts: { threshold: boo
     for (let i = 0; i <= n; i++) {
       const t = i / n;
       const j = (rng() - 0.5) * 12;
-      pts.push(horiz ? { x: b.x - 4 + (b.w + 8) * t, y: b.y + b.h * (0.35 + rng() * 0.3) + j * 0.4 } : { x: b.x + b.w * (0.35 + rng() * 0.3) + j * 0.4, y: b.y - 4 + (b.h + 8) * t });
+      pts.push(
+        horiz
+          ? { x: b.x - 4 + (b.w + 8) * t, y: b.y + b.h * (0.35 + rng() * 0.3) + j * 0.4 }
+          : { x: b.x + b.w * (0.35 + rng() * 0.3) + j * 0.4, y: b.y - 4 + (b.h + 8) * t },
+      );
     }
     line(ctx, pts, 7, palette.slab.mortar);
     line(ctx, translatePath(pts, -1.5, -1.5), 1.6, rgba(tones.light, 0.6));
@@ -262,12 +334,20 @@ export function floorBake(geom: WorldGeom, level: GeneratedLevel): Bake {
       // Раствор с мелкими камешками.
       ctx.fillStyle = palette.slab.mortar;
       ctx.fillRect(0, 0, W, H);
+      const pebblesA = new Path2D();
+      const pebblesB = new Path2D();
       for (let i = 0; i < (W * H) / 700; i++) {
-        ctx.fillStyle = rng() < 0.5 ? rgba(palette.rock.shadow, 0.9) : rgba(palette.rockFar, 0.9);
-        ctx.beginPath();
-        ctx.arc(rng() * W, rng() * H, 1.5 + rng() * 3.2, 0, Math.PI * 2);
-        ctx.fill();
+        const p = rng() < 0.5 ? pebblesA : pebblesB;
+        const x = rng() * W;
+        const y = rng() * H;
+        const r = 1.5 + rng() * 3.2;
+        p.moveTo(x + r, y);
+        p.arc(x, y, r, 0, Math.PI * 2);
       }
+      ctx.fillStyle = rgba(palette.rock.shadow, 0.9);
+      ctx.fill(pebblesA);
+      ctx.fillStyle = rgba(palette.rockFar, 0.9);
+      ctx.fill(pebblesB);
       const start = startIndex(g);
       for (let y = 0; y < g.rows; y++) {
         for (let x = 0; x < g.cols; x++) {

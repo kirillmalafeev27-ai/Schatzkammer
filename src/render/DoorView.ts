@@ -64,8 +64,15 @@ export class DoorView {
 
     // Небо в щели — дневной свет, сам светится.
     this.sky = art.img(d.cx, 0, D.sky).setDepth(DEPTH.sky).setBlendMode(blend.emissive);
-    this.skyLate = art.img(d.cx, 0, D.skyLate).setDepth(DEPTH.sky + 1).setAlpha(0).setBlendMode(blend.emissive);
-    this.rays = art.img(d.cx, 0, D.rays).setDepth(DEPTH.sky + 2).setBlendMode(blend.addKeep);
+    this.skyLate = art
+      .img(d.cx, 0, D.skyLate)
+      .setDepth(DEPTH.sky + 1)
+      .setAlpha(0)
+      .setBlendMode(blend.emissive);
+    this.rays = art
+      .img(d.cx, 0, D.rays)
+      .setDepth(DEPTH.sky + 2)
+      .setBlendMode(blend.addKeep);
     this.slab = art.img(d.cx, o.y, D.slab).setDepth(DEPTH.slab);
     this.slabTexH = this.slab.frame.height;
     this.slabH = this.slabTexH * this.slab.scaleY;
@@ -80,13 +87,30 @@ export class DoorView {
     const chainFrame = art.factory.frame(D.chain);
     this.chains = [-1, 1].map((side) => {
       const x = side < 0 ? o.x - d.frameW * 0.55 : o.x + o.w + d.frameW * 0.55;
-      const ts = scene.add.tileSprite(x, gearY, chainFrame.w, Math.round((-gearY - 6) * chainFrame.scale), chainFrame.key, chainFrame.frame);
+      const ts = scene.add.tileSprite(
+        x,
+        gearY,
+        chainFrame.w,
+        Math.round((-gearY - 6) * chainFrame.scale),
+        chainFrame.key,
+        chainFrame.frame,
+      );
       ts.setOrigin(0.5, 0);
       ts.setScale(1 / chainFrame.scale);
       ts.setDepth(DEPTH.frame + 1.5);
       return ts;
     });
-    this.layers.objects.add([this.sky, this.skyLate, this.rays, this.slab, frameL, frameR, lintel, ...this.chains, ...this.gears]);
+    this.layers.objects.add([
+      this.sky,
+      this.skyLate,
+      this.rays,
+      this.slab,
+      frameL,
+      frameR,
+      lintel,
+      ...this.chains,
+      ...this.gears,
+    ]);
 
     // Луч дневного света на полу: аддитивная трапеция, длина равна щели.
     this.beam = art.img(d.cx, -4, D.beam).setBlendMode(blend.addKeep).setAlpha(0.5);
@@ -95,7 +119,14 @@ export class DoorView {
       const img = art.img(0, 0, SPR.softDot).setBlendMode(blend.addKeep);
       img.setScale(art.baseScale(SPR.softDot) * (0.25 + this.rng() * 0.35));
       this.layers.atmos.add(img);
-      this.motes.push({ img, x: this.rng(), y: this.rng(), vx: (this.rng() - 0.5) * 0.02, vy: -0.01 - this.rng() * 0.02, phase: this.rng() * 6 });
+      this.motes.push({
+        img,
+        x: this.rng(),
+        y: this.rng(),
+        vx: (this.rng() - 0.5) * 0.02,
+        vy: -0.01 - this.rng() * 0.02,
+        phase: this.rng() * 6,
+      });
     }
 
     // Песочные часы.
@@ -105,7 +136,10 @@ export class DoorView {
     this.hgSandTop = art.img(hg.x, hg.y - 4, SPR.hourglass.sand).setDepth(DEPTH.wallProps - 2);
     this.hgSandBottom = art.img(hg.x, hg.y + hg.h * 0.43, SPR.hourglass.sand).setDepth(DEPTH.wallProps - 2);
     this.sandTexH = this.hgSandTop.frame.height;
-    this.hgStream = scene.add.rectangle(hg.x, hg.y, 2.2, hg.h * 0.4, hexToInt(palette.sand.light)).setOrigin(0.5, 0).setDepth(DEPTH.wallProps - 1);
+    this.hgStream = scene.add
+      .rectangle(hg.x, hg.y, 2.2, hg.h * 0.4, hexToInt(palette.sand.light))
+      .setOrigin(0.5, 0)
+      .setDepth(DEPTH.wallProps - 1);
     const glass = art.img(hg.x, hg.y, SPR.hourglass.glass).setDepth(DEPTH.wallProps + 1);
     this.layers.objects.add([this.hgSandTop, this.hgSandBottom, this.hgStream, frame, glass]);
     this.setProgress(0, 0);
@@ -149,7 +183,10 @@ export class DoorView {
     // Небо: к закату теплеет.
     this.skyLate.setAlpha(late);
     this.rays.setAlpha(0.35 + 0.65 * gap);
-    this.rays.setScale(this.art.baseScale(SPR.door.rays), this.art.baseScale(SPR.door.rays) * (0.3 + 0.7 * gap));
+    this.rays.setScale(
+      this.art.baseScale(SPR.door.rays),
+      this.art.baseScale(SPR.door.rays) * (0.3 + 0.7 * gap),
+    );
 
     // Луч на полу.
     const len = this.beamLength();

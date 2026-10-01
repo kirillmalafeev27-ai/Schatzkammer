@@ -32,6 +32,13 @@ export function litLayers(l: Layers): Phaser.GameObjects.Layer[] {
   return [l.bg, l.floor, l.shadows, l.objects, l.atmos];
 }
 
-export function destroyLayerChildren(l: Layers): void {
-  for (const layer of [l.bg, l.floor, l.shadows, l.objects, l.atmos, l.overlay]) layer.removeAll(true);
+/**
+ * Уничтожить детей слоя. Не `layer.removeAll(true)`: у слоя Phaser 4 аргумент — «не вызывать
+ * колбэк», и объекты только отцеплялись бы, оставаясь в памяти и в списке обновления.
+ */
+export function destroyChildren(
+  layer: Phaser.GameObjects.Layer,
+  keep?: (c: Phaser.GameObjects.GameObject) => boolean,
+): void {
+  for (const c of [...layer.list]) if (!keep?.(c)) c.destroy();
 }

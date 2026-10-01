@@ -175,7 +175,13 @@ export class ItemView {
   refuse(cell: number): void {
     const it = this.items.get(cell);
     if (!it || this.reduced) return;
-    this.scene.tweens.add({ targets: it.body, y: it.body.y - 26, duration: 140, yoyo: true, ease: 'Quad.Out' });
+    this.scene.tweens.add({
+      targets: it.body,
+      y: it.body.y - 26,
+      duration: 140,
+      yoyo: true,
+      ease: 'Quad.Out',
+    });
   }
 
   tremble(cell: number): void {
@@ -223,7 +229,7 @@ export class ItemView {
       it.root.destroy();
       it.shadow.destroy();
       it.halo?.destroy();
-        it.glint.destroy();
+      it.glint.destroy();
     }
     this.items.clear();
   }
@@ -240,7 +246,9 @@ export class ItemView {
       if (gem) {
         it.body.y = -18 - 3 * bob;
         if (it.halo) {
-          const pulse = this.reduced ? 0.5 : 0.5 + 0.5 * Math.sin((t / balance.anim.gemPulseMs) * Math.PI * 2 + it.phase);
+          const pulse = this.reduced
+            ? 0.5
+            : 0.5 + 0.5 * Math.sin((t / balance.anim.gemPulseMs) * Math.PI * 2 + it.phase);
           it.halo.setAlpha(0.55 + 0.35 * pulse);
           it.halo.setScale(this.art.baseScale(SPR.halo.ruby) * (0.92 + 0.12 * pulse));
           it.halo.setPosition(it.root.x, it.root.y - 34 - 3 * bob);
@@ -262,7 +270,7 @@ export class ItemView {
         }
       }
       // Глинт-звёздочка: изредка вспыхивает.
-      const gp = ((t / (gem ? 1700 : 2600) + it.phase) % 1 + 1) % 1;
+      const gp = (((t / (gem ? 1700 : 2600) + it.phase) % 1) + 1) % 1;
       const ga = gp < 0.12 && !this.reduced ? Math.sin((gp / 0.12) * Math.PI) : 0;
       it.glint.setAlpha(ga);
       it.glint.setPosition(it.root.x + (gem ? 10 : 9), it.root.y + (gem ? -46 : -30));

@@ -190,7 +190,13 @@ export function fillPath(ctx: Ctx, path: Path, color: string): void {
  * Трёхтоновая светотень: блик полумесяцем сверху слева, тень полумесяцем снизу справа.
  * `k` — ширина тени (≈ 12% размера объекта).
  */
-export function celShade(ctx: Ctx, path: Path, tones: Tones, k: number, opts: { lightK?: number } = {}): void {
+export function celShade(
+  ctx: Ctx,
+  path: Path,
+  tones: Tones,
+  k: number,
+  opts: { lightK?: number } = {},
+): void {
   const lk = opts.lightK ?? k * 0.5;
   const b = bounds(path);
   ctx.save();
@@ -251,14 +257,19 @@ export function halftone(ctx: Ctx, color: string, o: HalftoneOpts): void {
   const half = Math.hypot(region.w, region.h) / 2 + spacing;
   // Проекция углов области на направление роста — для нормировки.
   const proj = (x: number, y: number) => (x - cx) * dir.x + (y - cy) * dir.y;
-  const pr = Math.abs(region.w / 2 * dir.x) + Math.abs(region.h / 2 * dir.y) || 1;
+  const pr = Math.abs((region.w / 2) * dir.x) + Math.abs((region.h / 2) * dir.y) || 1;
   ctx.fillStyle = color;
   ctx.beginPath();
   for (let u = -half; u <= half; u += spacing) {
     for (let v = -half; v <= half; v += spacing) {
       const x = cx + u * ca - v * sa;
       const y = cy + u * sa + v * ca;
-      if (x < region.x - spacing || y < region.y - spacing || x > region.x + region.w + spacing || y > region.y + region.h + spacing)
+      if (
+        x < region.x - spacing ||
+        y < region.y - spacing ||
+        x > region.x + region.w + spacing ||
+        y > region.y + region.h + spacing
+      )
         continue;
       const t = Math.max(0, Math.min(1, (proj(x, y) / pr + 1) / 2));
       const r = o.rMin + (o.rMax - o.rMin) * t;
@@ -271,7 +282,13 @@ export function halftone(ctx: Ctx, color: string, o: HalftoneOpts): void {
 }
 
 /** Равномерный растр с постоянным радиусом. */
-export function halftoneFlat(ctx: Ctx, color: string, region: { x: number; y: number; w: number; h: number }, spacing: number, r: number): void {
+export function halftoneFlat(
+  ctx: Ctx,
+  color: string,
+  region: { x: number; y: number; w: number; h: number },
+  spacing: number,
+  r: number,
+): void {
   halftone(ctx, color, { region, spacing, rMin: r, rMax: r });
 }
 
@@ -376,7 +393,15 @@ export function glint(ctx: Ctx, x: number, y: number, r: number, color = '#fffff
 }
 
 /** Ломаная трещина с одним ответвлением. */
-export function crack(ctx: Ctx, rng: Rng, from: Pt, len: number, angle = rng() * Math.PI * 2, w = 2.5, color: string = palette.ink): Path {
+export function crack(
+  ctx: Ctx,
+  rng: Rng,
+  from: Pt,
+  len: number,
+  angle = rng() * Math.PI * 2,
+  w = 2.5,
+  color: string = palette.ink,
+): Path {
   const pts: Path = [from];
   let a = angle;
   let p = from;
@@ -392,13 +417,24 @@ export function crack(ctx: Ctx, rng: Rng, from: Pt, len: number, angle = rng() *
   const bp = pts[bi];
   const ba = angle + (rng() < 0.5 ? 1 : -1) * (0.6 + rng() * 0.6);
   const bl = len * (0.25 + rng() * 0.25);
-  const mid = { x: bp.x + Math.cos(ba) * bl * 0.5 + (rng() - 0.5) * 3, y: bp.y + Math.sin(ba) * bl * 0.5 + (rng() - 0.5) * 3 };
+  const mid = {
+    x: bp.x + Math.cos(ba) * bl * 0.5 + (rng() - 0.5) * 3,
+    y: bp.y + Math.sin(ba) * bl * 0.5 + (rng() - 0.5) * 3,
+  };
   brush(ctx, [bp, mid, { x: bp.x + Math.cos(ba) * bl, y: bp.y + Math.sin(ba) * bl }], w * 1.1, color, 0.2);
   return pts;
 }
 
 /** Взрыв-баллон под крупные слова-звуки. */
-export function burstPath(cx: number, cy: number, rIn: number, rOut: number, spikes: number, rng: Rng, squash = 0.75): Path {
+export function burstPath(
+  cx: number,
+  cy: number,
+  rIn: number,
+  rOut: number,
+  spikes: number,
+  rng: Rng,
+  squash = 0.75,
+): Path {
   const pts: Path = [];
   for (let i = 0; i < spikes * 2; i++) {
     const a = (i / (spikes * 2)) * Math.PI * 2 + (rng() - 0.5) * 0.12;
@@ -408,7 +444,17 @@ export function burstPath(cx: number, cy: number, rIn: number, rOut: number, spi
   return pts;
 }
 
-export function burst(ctx: Ctx, cx: number, cy: number, rIn: number, rOut: number, spikes: number, rng: Rng, fill: string, inkW: number): Path {
+export function burst(
+  ctx: Ctx,
+  cx: number,
+  cy: number,
+  rIn: number,
+  rOut: number,
+  spikes: number,
+  rng: Rng,
+  fill: string,
+  inkW: number,
+): Path {
   const p = burstPath(cx, cy, rIn, rOut, spikes, rng);
   fillPath(ctx, p, fill);
   ink(ctx, p, inkW);
@@ -440,7 +486,9 @@ export function makeCanvas(w: number, h: number): { canvas: HTMLCanvasElement; c
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(1, Math.ceil(w));
   canvas.height = Math.max(1, Math.ceil(h));
-  const ctx = canvas.getContext('2d', { willReadFrequently: false }) as Ctx;
+  // Растеризация на CPU: запекание — тысячи мелких контуров, и на GPU-канве (особенно программной,
+  // без драйвера) оно в десятки раз медленнее; готовая канва один раз копируется в текстуру WebGL.
+  const ctx = canvas.getContext('2d', { willReadFrequently: true }) as Ctx;
   return { canvas, ctx };
 }
 
@@ -456,7 +504,15 @@ export function radialSpot(ctx: Ctx, cx: number, cy: number, r: number, color: s
 }
 
 /** Ступенчатое «комиксное» пятно: кольца растра вместо градиента. */
-export function steppedHalo(ctx: Ctx, cx: number, cy: number, r: number, color: string, rings = 3, spacing = 6): void {
+export function steppedHalo(
+  ctx: Ctx,
+  cx: number,
+  cy: number,
+  r: number,
+  color: string,
+  rings = 3,
+  spacing = 6,
+): void {
   ctx.save();
   for (let i = rings; i >= 1; i--) {
     const rr = (r * i) / rings;

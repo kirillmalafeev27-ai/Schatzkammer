@@ -34,7 +34,11 @@ export function tonesVar(rng: Rng, t: Tones, light = 0.06, hue = 4): Tones {
 
 export function tonesFrom(base: string, shadowMul = 0.68, lightMul = 1.35, shadowHue = 8): Tones {
   // Тени сдвинуты по оттенку к фиолетовому.
-  return { base, shadow: shiftHex(base, shadowMul, shadowHue, 1.05), light: shiftHex(base, lightMul, -4, 0.95) };
+  return {
+    base,
+    shadow: shiftHex(base, shadowMul, shadowHue, 1.05),
+    light: shiftHex(base, lightMul, -4, 0.95),
+  };
 }
 
 export interface StoneOpts extends BlobOpts {
@@ -191,7 +195,15 @@ export function rock(ctx: Ctx, rng: Rng, w: number, h: number, tones: Tones, o: 
     for (const p of path) ctx.lineTo(p.x, p.y);
     ctx.closePath();
     ctx.clip();
-    for (let i = 0; i < cracks; i++) crack(ctx, rng, { x: b.x + b.w * (0.3 + rng() * 0.4), y: b.y + b.h * (0.25 + rng() * 0.4) }, Math.min(w, h) * 0.5, rng() * Math.PI * 2, 1.7);
+    for (let i = 0; i < cracks; i++)
+      crack(
+        ctx,
+        rng,
+        { x: b.x + b.w * (0.3 + rng() * 0.4), y: b.y + b.h * (0.25 + rng() * 0.4) },
+        Math.min(w, h) * 0.5,
+        rng() * Math.PI * 2,
+        1.7,
+      );
     ctx.restore();
   }
   ink(ctx, path, o.inkW ?? INK_MID);
@@ -203,13 +215,25 @@ function chaikinOnce(p: Path): Path {
   for (let i = 0; i < p.length; i++) {
     const a = p[i];
     const b = p[(i + 1) % p.length];
-    out.push({ x: a.x * 0.82 + b.x * 0.18, y: a.y * 0.82 + b.y * 0.18 }, { x: a.x * 0.18 + b.x * 0.82, y: a.y * 0.18 + b.y * 0.82 });
+    out.push(
+      { x: a.x * 0.82 + b.x * 0.18, y: a.y * 0.82 + b.y * 0.18 },
+      { x: a.x * 0.18 + b.x * 0.82, y: a.y * 0.18 + b.y * 0.82 },
+    );
   }
   return out;
 }
 
 /** Тёсаный блок кладки: неровный прямоугольник, фаска, сколы. */
-export function block(ctx: Ctx, rng: Rng, x: number, y: number, w: number, h: number, tones: Tones, inkW = 4.6): Path {
+export function block(
+  ctx: Ctx,
+  rng: Rng,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  tones: Tones,
+  inkW = 4.6,
+): Path {
   const p: Path = [];
   const j = () => (rng() - 0.5) * 3;
   const pts: [number, number][] = [
@@ -237,7 +261,15 @@ export function block(ctx: Ctx, rng: Rng, x: number, y: number, w: number, h: nu
     ctx.arc(x + rng() * w, y + rng() * h, 0.7 + rng() * 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
-  if (rng() < 0.3) crack(ctx, rng, { x: x + w * (0.2 + rng() * 0.6), y: y + h * 0.3 }, Math.min(w, h) * 0.7, Math.PI / 2 + (rng() - 0.5), 1.5);
+  if (rng() < 0.3)
+    crack(
+      ctx,
+      rng,
+      { x: x + w * (0.2 + rng() * 0.6), y: y + h * 0.3 },
+      Math.min(w, h) * 0.7,
+      Math.PI / 2 + (rng() - 0.5),
+      1.5,
+    );
   ctx.restore();
   ink(ctx, path, inkW);
   return path;

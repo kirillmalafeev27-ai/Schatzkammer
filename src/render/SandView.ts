@@ -6,6 +6,7 @@ import type { Art } from '../art/ArtFactory';
 import { SPR } from '../art/manifest';
 import type { GridShape } from '../core/grid';
 import { cellBase, cellCenter, CELL } from './geometry';
+import { blend } from './blend';
 import type { Layers } from './layers';
 
 interface Stream {
@@ -15,6 +16,8 @@ interface Stream {
   age: number;
   fadeAt: number;
   texH: number;
+  /** Струйка прозрачнее, пока за ней герой. */
+  heroK: number;
 }
 
 interface Dune {
@@ -42,19 +45,25 @@ export class SandView {
   warn(cell: number): void {
     if (this.streams.has(cell)) return;
     const b = cellBase(this.g, cell);
-    const img = this.art.img(b.x, b.y - 4, SPR.sandStream);
+    // Струйка светится сама: в неё падает свет из трещины, и в тёмном углу она видна.
+    const img = this.art.img(b.x, b.y - 4, SPR.sandStream).setBlendMode(blend.emissive);
     img.setAlpha(0.95);
     this.layers.atmos.add(img);
     const texH = img.frame.height;
     img.setCrop(0, 0, img.frame.width, 0);
     const grains: Stream['grains'] = [];
     for (let i = 0; i < 7; i++) {
-      const gi = this.art.img(b.x, b.y, SPR.sandGrain);
+      const gi = this.art.img(b.x, b.y, SPR.sandGrain).setBlendMode(blend.emissive);
       gi.setScale(this.art.baseScale(SPR.sandGrain) * (0.6 + this.rng() * 0.6));
       this.layers.atmos.add(gi);
-      grains.push({ img: gi, k: this.rng(), speed: 0.0016 + this.rng() * 0.0012, dx: (this.rng() - 0.5) * 12 });
+      grains.push({
+        img: gi,
+        k: this.rng(),
+        speed: 0.0016 + this.rng() * 0.0012,
+        dx: (this.rng() - 0.5) * 12,
+      });
     }
-    this.streams.set(cell, { cell, img, grains, age: 0, fadeAt: Infinity, texH });
+    this.streams.set(cell, { cell, img, grains, age: 0, fadeAt: Infinity, texH, heroK: 1 });
     this.setDune(cell, 0);
   }
 
@@ -113,7 +122,8 @@ export class SandView {
     return (this.dunes.get(cell)?.stage ?? -1) >= 1;
   }
 
-  update(dt: number): void {
+  /** hero — ноги героя: струйка над ним или перед ним становится полупрозрачной. */
+  update(dt: number, hero?: { x: number; y: number }): void {
     for (const s of this.streams.values()) {
       s.age += dt;
       // Струя проявляется сверху вниз за 350 мс.
@@ -121,14 +131,20 @@ export class SandView {
       s.img.setCrop(0, 0, s.img.frame.width, s.texH * reveal);
       const fading = s.age > s.fadeAt;
       const fadeK = fading ? Math.max(0, 1 - (s.age - s.fadeAt) / 700) : 1;
-      s.img.setAlpha(0.95 * fadeK);
+      const covers =
+        !!hero &&
+        Math.abs(hero.x - s.img.x) < CELL * 0.35 &&
+        hero.y <= s.img.y + 6 &&
+        hero.y >= s.img.y - s.img.displayHeight * 0.9;
+      s.heroK += ((covers ? 0.3 : 1) - s.heroK) * Math.min(1, dt / 120);
+      s.img.setAlpha(0.95 * fadeK * s.heroK);
       const topY = s.img.y - s.img.displayHeight;
       for (const gr of s.grains) {
         if (!this.reduced) gr.k += gr.speed * dt;
         if (gr.k > 1) gr.k -= 1;
         const y = topY + gr.k * s.img.displayHeight * reveal;
         gr.img.setPosition(s.img.x + gr.dx * gr.k, y);
-        gr.img.setAlpha(fadeK * (reveal > gr.k ? 1 : 0));
+        gr.img.setAlpha(fadeK * s.heroK * (reveal > gr.k ? 1 : 0));
       }
       if (fading && fadeK <= 0) {
         s.img.destroy();

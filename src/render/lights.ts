@@ -15,7 +15,10 @@ function mixRgb(a: Rgb, b: Rgb, t: number): Rgb {
 
 /** Дешёвый гладкий шум для мерцания. */
 export function noise1(t: number, seed: number): number {
-  const s = Math.sin(t * 1.7 + seed * 12.9) * 0.5 + Math.sin(t * 3.1 + seed * 4.1) * 0.3 + Math.sin(t * 7.3 + seed * 1.3) * 0.2;
+  const s =
+    Math.sin(t * 1.7 + seed * 12.9) * 0.5 +
+    Math.sin(t * 3.1 + seed * 4.1) * 0.3 +
+    Math.sin(t * 7.3 + seed * 1.3) * 0.2;
   return s;
 }
 
@@ -69,7 +72,13 @@ export function computeLights(inp: LightInputs): LightFrame {
 
   if (inp.lantern) {
     const n = still ? 0 : noise1(t * 3, 99) * 0.05;
-    out.push({ x: inp.lantern.x, y: inp.lantern.y, radius: L.lantern.radius * CELL, color: lanternRgb, intensity: L.lantern.intensity * (1 + n) });
+    out.push({
+      x: inp.lantern.x,
+      y: inp.lantern.y,
+      radius: L.lantern.radius * CELL,
+      color: lanternRgb,
+      intensity: L.lantern.intensity * (1 + n),
+    });
   }
 
   if (inp.door && inp.door.gapFrac > 0.001) {
@@ -89,12 +98,22 @@ export function computeLights(inp: LightInputs): LightFrame {
   }
 
   if (inp.hourglass) {
-    out.push({ x: inp.hourglass.x, y: inp.hourglass.y, radius: L.hourglass.radius * CELL, color: sandRgb, intensity: L.hourglass.intensity });
+    out.push({
+      x: inp.hourglass.x,
+      y: inp.hourglass.y,
+      radius: L.hourglass.radius * CELL,
+      color: sandRgb,
+      intensity: L.hourglass.intensity,
+    });
   }
 
   // Камни: ближе к герою — важнее.
   const free = L.maxLights - out.length;
-  const order = inp.gems.map((g, i) => ({ g, i, d: inp.hero ? Math.hypot(g.x - inp.hero.x, g.y - inp.hero.y) : 0 }));
+  const order = inp.gems.map((g, i) => ({
+    g,
+    i,
+    d: inp.hero ? Math.hypot(g.x - inp.hero.x, g.y - inp.hero.y) : 0,
+  }));
   order.sort((a, b) => a.d - b.d);
   const overflowGems: number[] = [];
   let used = 0;
@@ -114,7 +133,13 @@ export function computeLights(inp: LightInputs): LightFrame {
   for (const c of inp.crystals) {
     if (out.length >= L.maxLights) break;
     const pulse = still ? 0 : Math.sin((inp.timeMs / L.crystal.pulseMs) * Math.PI * 2 + c.phase);
-    out.push({ x: c.x, y: c.y, radius: L.crystal.radius * CELL, color: crystalRgb, intensity: L.crystal.intensity * (1 + 0.25 * pulse) });
+    out.push({
+      x: c.x,
+      y: c.y,
+      radius: L.crystal.radius * CELL,
+      color: crystalRgb,
+      intensity: L.crystal.intensity * (1 + 0.25 * pulse),
+    });
   }
   return { lights: out, overflowGems };
 }
@@ -122,5 +147,9 @@ export function computeLights(inp: LightInputs): LightFrame {
 export function ambientRgb(): Rgb {
   const a = hexToRgb01(palette.ambient);
   const m = Math.max(a[0], a[1], a[2]);
-  return [(a[0] / m) * balance.light.ambient, (a[1] / m) * balance.light.ambient, (a[2] / m) * balance.light.ambient];
+  return [
+    (a[0] / m) * balance.light.ambient,
+    (a[1] / m) * balance.light.ambient,
+    (a[2] / m) * balance.light.ambient,
+  ];
 }

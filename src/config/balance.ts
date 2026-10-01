@@ -140,6 +140,8 @@ export const balance = {
     tintAmount: 0.75,
     /** Добавка цвета света на верхней ступени: пятна светятся, а не сереют. */
     glow: 0.22,
+    /** Насколько верхняя ступень принимает оттенок источника при той же яркости. */
+    gel: 0.45,
     torch: { radius: 3.5, intensity: 1.0, flickerIntensity: 0.12, flickerRadius: 0.06 },
     lantern: { radius: 2.2, intensity: 0.8 },
     door: { radius: 3.0, intensity: 1.2, points: 3 },
@@ -174,6 +176,8 @@ export const balance = {
     gutterMax: 14,
     promptFontMax: 24,
     promptFontMin: 16,
+    optionFontMax: 21,
+    optionFontMin: 13,
     optionMinHeight: 56,
   },
 

@@ -61,7 +61,12 @@ export function worldGeom(g: GridShape, seed: number): WorldGeom {
   const northH = Math.round(w.northWall * CELL);
   const ceilH = Math.round(w.ceiling * CELL);
   const southH = Math.round(w.southLedge * CELL);
-  const bounds = { x: -sideW, y: -(northH + ceilH), w: floorW + sideW * 2, h: northH + ceilH + floorH + southH };
+  const bounds = {
+    x: -sideW,
+    y: -(northH + ceilH),
+    w: floorW + sideW * 2,
+    h: northH + ceilH + floorH + southH,
+  };
 
   const cx = (g.doorCol + 0.5) * CELL;
   const openW = Math.round(0.84 * CELL);

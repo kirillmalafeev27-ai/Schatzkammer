@@ -45,7 +45,9 @@ export class AudioEngine {
     if (this.destroyed) return;
     try {
       if (!this.ctx) {
-        const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        const Ctor =
+          window.AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         if (!Ctor) return;
         this.ctx = new Ctor({ latencyHint: 'interactive' });
         this.build();
@@ -144,7 +146,12 @@ export class AudioEngine {
     if (!preset) return;
     const ctx = this.ctx!;
     const jitter = 1 + (Math.random() * 2 - 1) * balance.audio.pitchJitter;
-    const o: Required<PlayOpts> = { pan: opts.pan ?? 0, pitch: (opts.pitch ?? 1) * jitter, vol: opts.vol ?? 1, k: opts.k ?? 0 };
+    const o: Required<PlayOpts> = {
+      pan: opts.pan ?? 0,
+      pitch: (opts.pitch ?? 1) * jitter,
+      vol: opts.vol ?? 1,
+      k: opts.k ?? 0,
+    };
     const panner = ctx.createStereoPanner();
     panner.pan.value = Math.max(-1, Math.min(1, o.pan));
     const g = ctx.createGain();
@@ -304,7 +311,14 @@ export class AudioEngine {
   rumble(): void {
     if (!this.ready || !this.ambientBus) return;
     const t = this.ctx!.currentTime + 0.02;
-    this.noise(this.ambientBus, t, 1.6, 0.35, { type: 'lowpass', f: 140, f1: 60 }, { attack: 0.25, brown: true, send: 0.6 });
+    this.noise(
+      this.ambientBus,
+      t,
+      1.6,
+      0.35,
+      { type: 'lowpass', f: 140, f1: 60 },
+      { attack: 0.25, brown: true, send: 0.6 },
+    );
   }
 
   /** Непрерывный скрежет двери: громкость по скорости. */

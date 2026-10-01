@@ -82,7 +82,9 @@ const soft = (pts: [number, number][], passes = 1): Path => chaikin(polyPath(pts
 // ── Ноги ─────────────────────────────────────────────────────────────────
 
 function boot(ctx: Ctx, back: boolean): void {
-  const t = back ? { base: T.boots.shadow, shadow: shiftHex(T.boots.shadow, 0.72), light: T.boots.base } : T.boots;
+  const t = back
+    ? { base: T.boots.shadow, shadow: shiftHex(T.boots.shadow, 0.72), light: T.boots.base }
+    : T.boots;
   const p = soft([
     [8, 2],
     [21, 2],
@@ -95,13 +97,31 @@ function boot(ctx: Ctx, back: boolean): void {
   ]);
   part(ctx, p, t, 4, 4.8, false);
   // Подошва и отворот голенища.
-  line(ctx, [{ x: 6, y: 19 }, { x: 34, y: 19 }], 3.2, palette.ink);
-  line(ctx, [{ x: 8, y: 6.5 }, { x: 21, y: 6.5 }], 2.2, rgba(palette.ink, 0.65));
+  line(
+    ctx,
+    [
+      { x: 6, y: 19 },
+      { x: 34, y: 19 },
+    ],
+    3.2,
+    palette.ink,
+  );
+  line(
+    ctx,
+    [
+      { x: 8, y: 6.5 },
+      { x: 21, y: 6.5 },
+    ],
+    2.2,
+    rgba(palette.ink, 0.65),
+  );
   if (!back) glint(ctx, 27, 13, 3.2);
 }
 
 function leg(ctx: Ctx, back: boolean): void {
-  const t = back ? { base: T.pants.shadow, shadow: shiftHex(T.pants.shadow, 0.74), light: T.pants.base } : T.pants;
+  const t = back
+    ? { base: T.pants.shadow, shadow: shiftHex(T.pants.shadow, 0.74), light: T.pants.base }
+    : T.pants;
   const p = soft([
     [2, 1],
     [21, 1],
@@ -109,7 +129,15 @@ function leg(ctx: Ctx, back: boolean): void {
     [3, 34],
   ]);
   part(ctx, p, t, 4, 4.6);
-  line(ctx, [{ x: 4, y: 27 }, { x: 19, y: 27 }], 2.2, rgba(palette.ink, 0.7));
+  line(
+    ctx,
+    [
+      { x: 4, y: 27 },
+      { x: 19, y: 27 },
+    ],
+    2.2,
+    rgba(palette.ink, 0.7),
+  );
 }
 
 // ── Корпус ───────────────────────────────────────────────────────────────
@@ -125,66 +153,176 @@ function torso(ctx: Ctx): void {
   ]);
   part(ctx, p, T.shirt, 6.5);
   // Воротник углом.
-  const col = polyPath([[21, 5], [30, 16], [39, 5]]);
+  const col = polyPath([
+    [21, 5],
+    [30, 16],
+    [39, 5],
+  ]);
   fillPath(ctx, col, T.shirt.shadow);
   line(ctx, col, 2.6, palette.ink);
   for (const y of [22, 32]) fillPath(ctx, ellipsePath(31, y, 1.9, 1.9), palette.ink);
   // Нагрудный карман.
-  const pocket = polyPath([[37, 19], [48, 19], [48, 29], [37, 29]]);
+  const pocket = polyPath([
+    [37, 19],
+    [48, 19],
+    [48, 29],
+    [37, 29],
+  ]);
   fillPath(ctx, pocket, T.shirt.shadow);
   line(ctx, pocket, 2.2, palette.ink, true);
-  line(ctx, [{ x: 37, y: 22 }, { x: 48, y: 22 }], 1.6, palette.ink);
+  line(
+    ctx,
+    [
+      { x: 37, y: 22 },
+      { x: 48, y: 22 },
+    ],
+    1.6,
+    palette.ink,
+  );
   // Лямка мешка по диагонали.
-  const strap = polyPath([[8, 5], [16, 5], [46, 45], [38, 47]]);
+  const strap = polyPath([
+    [8, 5],
+    [16, 5],
+    [46, 45],
+    [38, 47],
+  ]);
   fillPath(ctx, strap, T.bag.shadow);
   line(ctx, strap, 2.6, palette.ink, true);
   for (let i = 0; i < 4; i++) {
     const k = 0.14 + i * 0.22;
     const x = 12 + (42 - 12) * k;
     const y = 5 + (46 - 5) * k;
-    line(ctx, [{ x: x - 2.5, y }, { x: x + 2.5, y: y + 0.6 }], 1.5, P.bagStitch);
+    line(
+      ctx,
+      [
+        { x: x - 2.5, y },
+        { x: x + 2.5, y: y + 0.6 },
+      ],
+      1.5,
+      P.bagStitch,
+    );
   }
   // Ремень с латунной пряжкой.
-  const belt = polyPath([[6, 43], [54, 43], [54, 51], [6, 51]]);
+  const belt = polyPath([
+    [6, 43],
+    [54, 43],
+    [54, 51],
+    [6, 51],
+  ]);
   fillPath(ctx, belt, P.boots);
   line(ctx, belt, 2.6, palette.ink, true);
-  const buckle = polyPath([[27, 42], [35, 42], [35, 52], [27, 52]]);
+  const buckle = polyPath([
+    [27, 42],
+    [35, 42],
+    [35, 52],
+    [27, 52],
+  ]);
   celShade(ctx, buckle, T.brass, 2);
   line(ctx, buckle, 2.4, palette.ink, true);
   ink(ctx, p, LINE);
 }
 
 function arm(ctx: Ctx, back: boolean): void {
-  const shirt = back ? { base: T.shirt.shadow, shadow: shiftHex(T.shirt.shadow, 0.78), light: T.shirt.base } : T.shirt;
-  const skin = back ? { base: T.skin.shadow, shadow: shiftHex(T.skin.shadow, 0.8), light: T.skin.base } : T.skin;
-  const fore = soft([[5, 18], [15, 18], [15, 34], [5, 34]]);
+  const shirt = back
+    ? { base: T.shirt.shadow, shadow: shiftHex(T.shirt.shadow, 0.78), light: T.shirt.base }
+    : T.shirt;
+  const skin = back
+    ? { base: T.skin.shadow, shadow: shiftHex(T.skin.shadow, 0.8), light: T.skin.base }
+    : T.skin;
+  const fore = soft([
+    [5, 18],
+    [15, 18],
+    [15, 34],
+    [5, 34],
+  ]);
   part(ctx, fore, skin, 3, 4.2, false);
-  const sleeve = soft([[2, 2], [18, 2], [18, 21], [2, 22]]);
+  const sleeve = soft([
+    [2, 2],
+    [18, 2],
+    [18, 21],
+    [2, 22],
+  ]);
   part(ctx, sleeve, shirt, 3.6, 4.4, false);
-  line(ctx, [{ x: 3, y: 17 }, { x: 18, y: 16 }], 2.4, palette.ink);
+  line(
+    ctx,
+    [
+      { x: 3, y: 17 },
+      { x: 18, y: 16 },
+    ],
+    2.4,
+    palette.ink,
+  );
   const fist = blob(mulberry32(back ? 3 : 4), 16, 14, { cx: 10, cy: 37, points: 8, jitter: 0.05 });
   part(ctx, fist, skin, 3, 4.2, false);
 }
 
 function lantern(ctx: Ctx): void {
   line(ctx, ellipsePath(12, 3, 4, 3), 2.2, palette.ink, true);
-  const cap = soft([[5, 6], [19, 6], [17, 11], [7, 11]]);
+  const cap = soft([
+    [5, 6],
+    [19, 6],
+    [17, 11],
+    [7, 11],
+  ]);
   part(ctx, cap, T.brass, 2, 3, false);
-  const glass = polyPath([[6, 11], [18, 11], [19, 25], [5, 25]]);
+  const glass = polyPath([
+    [6, 11],
+    [18, 11],
+    [19, 25],
+    [5, 25],
+  ]);
   fillPath(ctx, glass, P.lantern);
-  fillPath(ctx, polyPath([[7, 12], [11, 12], [10, 24], [6, 24]]), '#fff6cf');
+  fillPath(
+    ctx,
+    polyPath([
+      [7, 12],
+      [11, 12],
+      [10, 24],
+      [6, 24],
+    ]),
+    '#fff6cf',
+  );
   fillPath(ctx, ellipsePath(12, 19, 3, 4.5), '#ffffff');
   line(ctx, glass, 3, palette.ink, true);
-  line(ctx, [{ x: 12, y: 11 }, { x: 12, y: 25 }], 1.6, rgba(palette.ink, 0.7));
-  const bottom = soft([[4, 25], [20, 25], [18, 30], [6, 30]]);
+  line(
+    ctx,
+    [
+      { x: 12, y: 11 },
+      { x: 12, y: 25 },
+    ],
+    1.6,
+    rgba(palette.ink, 0.7),
+  );
+  const bottom = soft([
+    [4, 25],
+    [20, 25],
+    [18, 30],
+    [6, 30],
+  ]);
   part(ctx, bottom, T.brass, 2, 3, false);
 }
 
 function scarf(ctx: Ctx): void {
   const p = blob(mulberry32(21), 50, 19, { cx: 27, cy: 11, points: 9, jitter: 0.05 });
   part(ctx, p, T.scarf, 4, 4.6);
-  line(ctx, [{ x: 13, y: 8 }, { x: 23, y: 13 }], 1.8, rgba(palette.ink, 0.55));
-  line(ctx, [{ x: 28, y: 13 }, { x: 39, y: 9 }], 1.8, rgba(palette.ink, 0.55));
+  line(
+    ctx,
+    [
+      { x: 13, y: 8 },
+      { x: 23, y: 13 },
+    ],
+    1.8,
+    rgba(palette.ink, 0.55),
+  );
+  line(
+    ctx,
+    [
+      { x: 28, y: 13 },
+      { x: 39, y: 9 },
+    ],
+    1.8,
+    rgba(palette.ink, 0.55),
+  );
 }
 
 function scarfTail(ctx: Ctx): void {
@@ -200,7 +338,15 @@ function scarfTail(ctx: Ctx): void {
     [41, 11],
   ]);
   part(ctx, p, T.scarf, 3.5, 4.4, false);
-  line(ctx, [{ x: 31, y: 6.5 }, { x: 16, y: 8.5 }], 1.6, rgba(palette.ink, 0.5));
+  line(
+    ctx,
+    [
+      { x: 31, y: 6.5 },
+      { x: 16, y: 8.5 },
+    ],
+    1.6,
+    rgba(palette.ink, 0.5),
+  );
 }
 
 // ── Голова ───────────────────────────────────────────────────────────────
@@ -235,7 +381,15 @@ function head(ctx: Ctx): void {
   fillPath(ctx, ellipsePath(48, 44, 6, 3.6), rgba('#ff6a5a', 0.38));
   ink(ctx, p, LINE);
   // Завиток уха поверх контура.
-  line(ctx, [{ x: 14, y: 33 }, { x: 16, y: 40 }], 2, rgba(palette.ink, 0.7));
+  line(
+    ctx,
+    [
+      { x: 14, y: 33 },
+      { x: 16, y: 40 },
+    ],
+    2,
+    rgba(palette.ink, 0.7),
+  );
   // Нос картошкой справа.
   const nose = blob(mulberry32(34), 15, 13, { cx: 63, cy: 39, points: 8, jitter: 0.04 });
   part(ctx, nose, T.skin, 2.6, 4, false);
@@ -244,7 +398,12 @@ function head(ctx: Ctx): void {
   ctx.beginPath();
   tracePath(ctx, p);
   ctx.clip();
-  halftone(ctx, rgba(palette.ink, 0.2), { region: { x: 32, y: 50, w: 28, h: 12 }, spacing: 3.2, rMin: 0.55, rMax: 0.65 });
+  halftone(ctx, rgba(palette.ink, 0.2), {
+    region: { x: 32, y: 50, w: 28, h: 12 },
+    spacing: 3.2,
+    rMin: 0.55,
+    rMax: 0.65,
+  });
   ctx.restore();
 }
 
@@ -255,7 +414,17 @@ function eyes(ctx: Ctx, look: 'side' | 'front' | 'back' | 'closed'): void {
     [22, 4.8, 6.6],
   ] as const) {
     if (look === 'closed') {
-      brush(ctx, [{ x: cx - 5.5, y: 8 }, { x: cx, y: 11 }, { x: cx + 5.5, y: 8 }], 3, palette.ink, 0.5);
+      brush(
+        ctx,
+        [
+          { x: cx - 5.5, y: 8 },
+          { x: cx, y: 11 },
+          { x: cx + 5.5, y: 8 },
+        ],
+        3,
+        palette.ink,
+        0.5,
+      );
       continue;
     }
     const e = ellipsePath(cx, 8, rx, ry, 24);
@@ -272,40 +441,116 @@ function eyes(ctx: Ctx, look: 'side' | 'front' | 'back' | 'closed'): void {
 function brows(ctx: Ctx, mood: 'neutral' | 'worried' | 'strain' | 'happy'): void {
   const L: Record<typeof mood, [number, number][][]> = {
     neutral: [
-      [[2, 7.5], [8, 5], [14, 6]],
-      [[17, 6], [23, 4.5], [29, 6.5]],
+      [
+        [2, 7.5],
+        [8, 5],
+        [14, 6],
+      ],
+      [
+        [17, 6],
+        [23, 4.5],
+        [29, 6.5],
+      ],
     ],
     // Брови домиком: внутренние концы вверх.
     worried: [
-      [[2, 8.5], [8, 6.5], [14, 2.5]],
-      [[17, 2.5], [23, 6.5], [29, 8.5]],
+      [
+        [2, 8.5],
+        [8, 6.5],
+        [14, 2.5],
+      ],
+      [
+        [17, 2.5],
+        [23, 6.5],
+        [29, 8.5],
+      ],
     ],
     // Натуга: внутренние концы вниз.
     strain: [
-      [[2, 3.5], [8, 5.5], [14, 9]],
-      [[17, 9], [23, 5.5], [29, 3.5]],
+      [
+        [2, 3.5],
+        [8, 5.5],
+        [14, 9],
+      ],
+      [
+        [17, 9],
+        [23, 5.5],
+        [29, 3.5],
+      ],
     ],
     happy: [
-      [[2, 6.5], [8, 2.5], [14, 5.5]],
-      [[17, 5.5], [23, 2.5], [29, 6.5]],
+      [
+        [2, 6.5],
+        [8, 2.5],
+        [14, 5.5],
+      ],
+      [
+        [17, 5.5],
+        [23, 2.5],
+        [29, 6.5],
+      ],
     ],
   };
   for (const b of L[mood]) brush(ctx, polyPath(b), 4.8, HAIR, 0.55);
 }
 
 function mouth(ctx: Ctx, kind: 'smile' | 'open' | 'flat' | 'grit'): void {
-  if (kind === 'smile') brush(ctx, [{ x: 2, y: 4 }, { x: 8, y: 8.5 }, { x: 16, y: 4 }], 3.4, palette.ink, 0.45);
-  else if (kind === 'flat') brush(ctx, [{ x: 3, y: 7 }, { x: 9, y: 5.8 }, { x: 15, y: 7.6 }], 3, palette.ink, 0.5);
+  if (kind === 'smile')
+    brush(
+      ctx,
+      [
+        { x: 2, y: 4 },
+        { x: 8, y: 8.5 },
+        { x: 16, y: 4 },
+      ],
+      3.4,
+      palette.ink,
+      0.45,
+    );
+  else if (kind === 'flat')
+    brush(
+      ctx,
+      [
+        { x: 3, y: 7 },
+        { x: 9, y: 5.8 },
+        { x: 15, y: 7.6 },
+      ],
+      3,
+      palette.ink,
+      0.5,
+    );
   else if (kind === 'open') {
     const m = ellipsePath(9, 6.5, 6, 5);
     fillPath(ctx, m, '#7a1f2c');
     fillPath(ctx, ellipsePath(9, 9, 3.4, 1.8), '#ff8a8a');
     line(ctx, m, 2.4, palette.ink, true);
   } else {
-    const m = polyPath([[2, 3.5], [16, 3.5], [15, 10], [3, 10]]);
+    const m = polyPath([
+      [2, 3.5],
+      [16, 3.5],
+      [15, 10],
+      [3, 10],
+    ]);
     fillPath(ctx, m, '#ffffff');
-    line(ctx, [{ x: 2, y: 6.8 }, { x: 16, y: 6.8 }], 1.4, palette.ink);
-    for (const x of [6, 10, 13]) line(ctx, [{ x, y: 3.5 }, { x, y: 10 }], 1.2, palette.ink);
+    line(
+      ctx,
+      [
+        { x: 2, y: 6.8 },
+        { x: 16, y: 6.8 },
+      ],
+      1.4,
+      palette.ink,
+    );
+    for (const x of [6, 10, 13])
+      line(
+        ctx,
+        [
+          { x, y: 3.5 },
+          { x, y: 10 },
+        ],
+        1.2,
+        palette.ink,
+      );
     line(ctx, m, 2.4, palette.ink, true);
   }
 }
@@ -341,15 +586,37 @@ function hat(ctx: Ctx): void {
     true,
   );
   part(ctx, crown, T.hat, 6.5, LINE);
-  const band = polyPath([[25, 28], [67, 28], [68, 36], [24, 36]]);
+  const band = polyPath([
+    [25, 28],
+    [67, 28],
+    [68, 36],
+    [24, 36],
+  ]);
   fillPath(ctx, band, shiftHex(P.hat, 0.52, 10));
   line(ctx, band, 2.6, palette.ink, true);
-  brush(ctx, [{ x: 39, y: 12 }, { x: 46, y: 17 }, { x: 53, y: 11 }], 2.8, rgba(palette.ink, 0.8), 0.4);
+  brush(
+    ctx,
+    [
+      { x: 39, y: 12 },
+      { x: 46, y: 17 },
+      { x: 53, y: 11 },
+    ],
+    2.8,
+    rgba(palette.ink, 0.8),
+    0.4,
+  );
   glint(ctx, 33, 18, 3.6);
 }
 
 function sweat(ctx: Ctx): void {
-  const p = soft([[6, 1], [10, 9], [9, 13], [6, 15], [3, 13], [2, 9]]);
+  const p = soft([
+    [6, 1],
+    [10, 9],
+    [9, 13],
+    [6, 15],
+    [3, 13],
+    [2, 9],
+  ]);
   fillPath(ctx, p, palette.sweat);
   line(ctx, p, 2, palette.ink, true);
   fillPath(ctx, ellipsePath(5, 10, 1.2, 1.6), '#ffffff');
@@ -375,23 +642,69 @@ function bag(ctx: Ctx, stage: number): void {
     coin(cx + 7 * s, cy - 34 * s, 0.3);
     if (stage >= 3) {
       coin(cx - 1, cy - 39 * s, 0.1);
-      const gem = polyPath([[cx + 14 * s, cy - 42 * s], [cx + 22 * s, cy - 34 * s], [cx + 14 * s, cy - 26 * s], [cx + 6 * s, cy - 34 * s]]);
+      const gem = polyPath([
+        [cx + 14 * s, cy - 42 * s],
+        [cx + 22 * s, cy - 34 * s],
+        [cx + 14 * s, cy - 26 * s],
+        [cx + 6 * s, cy - 34 * s],
+      ]);
       fillPath(ctx, gem, palette.ruby.base);
-      fillPath(ctx, polyPath([[cx + 14 * s, cy - 42 * s], [cx + 6 * s, cy - 34 * s], [cx + 14 * s, cy - 34 * s]]), palette.ruby.light);
+      fillPath(
+        ctx,
+        polyPath([
+          [cx + 14 * s, cy - 42 * s],
+          [cx + 6 * s, cy - 34 * s],
+          [cx + 14 * s, cy - 34 * s],
+        ]),
+        palette.ruby.light,
+      );
       line(ctx, gem, 2.4, palette.ink, true);
     }
   }
-  const body = blob(mulberry32(51 + stage), 50 * s + 8, 48 * s + 10, { cx, cy: cy + 2, points: 10, jitter: 0.06, flatBottom: 0.12 });
+  const body = blob(mulberry32(51 + stage), 50 * s + 8, 48 * s + 10, {
+    cx,
+    cy: cy + 2,
+    points: 10,
+    jitter: 0.06,
+    flatBottom: 0.12,
+  });
   celShade(ctx, body, T.bag, 7 * s + 2.5, { lightK: 3 });
   shadeDots(ctx, body, 7 * s + 2.5, 4.5, 1.8);
-  const neck = blob(mulberry32(61 + stage), 26 * s + 7, 12 * s + 5, { cx, cy: cy - 23 * s - 1, points: 8, jitter: 0.1 });
+  const neck = blob(mulberry32(61 + stage), 26 * s + 7, 12 * s + 5, {
+    cx,
+    cy: cy - 23 * s - 1,
+    points: 8,
+    jitter: 0.1,
+  });
   part(ctx, neck, T.bag, 3, 4.2, false);
-  line(ctx, [{ x: cx - 10 * s - 2, y: cy - 17 * s }, { x: cx + 10 * s + 2, y: cy - 17 * s }], 3.2, P.bagStitch);
-  const patch = polyPath([[cx - 6, cy + 2], [cx + 9 * s, cy], [cx + 10 * s, cy + 12 * s], [cx - 5, cy + 13 * s]]);
+  line(
+    ctx,
+    [
+      { x: cx - 10 * s - 2, y: cy - 17 * s },
+      { x: cx + 10 * s + 2, y: cy - 17 * s },
+    ],
+    3.2,
+    P.bagStitch,
+  );
+  const patch = polyPath([
+    [cx - 6, cy + 2],
+    [cx + 9 * s, cy],
+    [cx + 10 * s, cy + 12 * s],
+    [cx - 5, cy + 13 * s],
+  ]);
   fillPath(ctx, patch, T.bag.light);
   line(ctx, patch, 2, palette.ink, true);
   ink(ctx, body, LINE);
-  if (stage >= 1) brush(ctx, [{ x: cx - 18 * s, y: cy + 8 }, { x: cx - 12 * s, y: cy + 15 * s }], 2.6, rgba(palette.ink, 0.7));
+  if (stage >= 1)
+    brush(
+      ctx,
+      [
+        { x: cx - 18 * s, y: cy + 8 },
+        { x: cx - 12 * s, y: cy + 15 * s },
+      ],
+      2.6,
+      rgba(palette.ink, 0.7),
+    );
 }
 
 export function heroSprites(add: AddSprite): void {

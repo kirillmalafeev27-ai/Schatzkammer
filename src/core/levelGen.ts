@@ -55,7 +55,13 @@ function chebyshevOk(g: GridShape, gems: number[], c: number, minD: number): boo
   return true;
 }
 
-function buildAttempt(cfg: LevelConfig, cols: number, rows: number, rng: Rng, gemMaxDist: number): Attempt | null {
+function buildAttempt(
+  cfg: LevelConfig,
+  cols: number,
+  rows: number,
+  rng: Rng,
+  gemMaxDist: number,
+): Attempt | null {
   const lg = balance.levelGen;
   const doorCol = randInt(rng, lg.doorCornerMargin, cols - 1 - lg.doorCornerMargin);
   const g: GridShape = { cols, rows, doorCol };
@@ -257,7 +263,9 @@ export function generateLevel(baseCfg: LevelConfig, opts: GenerateOptions): Gene
       const ok = cheapOk && s3 >= s2 + starGap;
       if (ok) {
         if (relax > 0) {
-          warnings.push(`levelGen: требования ослаблены на ${relax * 10}% (уровень ${cfg.id}, сид ${opts.seed})`);
+          warnings.push(
+            `levelGen: требования ослаблены на ${relax * 10}% (уровень ${cfg.id}, сид ${opts.seed})`,
+          );
         }
         return level;
       }
@@ -265,6 +273,8 @@ export function generateLevel(baseCfg: LevelConfig, opts: GenerateOptions): Gene
     }
   }
   if (!fallback) throw new Error(`levelGen: не удалось построить зал (уровень ${cfg.id}, сид ${opts.seed})`);
-  warnings.push(`levelGen: проверка дилеммы не пройдена, взят лучший вариант (уровень ${cfg.id}, сид ${opts.seed})`);
+  warnings.push(
+    `levelGen: проверка дилеммы не пройдена, взят лучший вариант (уровень ${cfg.id}, сид ${opts.seed})`,
+  );
   return fallback;
 }

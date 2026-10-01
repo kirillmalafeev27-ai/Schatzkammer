@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { exitIndex } from '../src/core/grid';
 import { Item } from '../src/core/rules';
-import { awaitingTarget, canAnswer, createState, currentCost, reduce, replay, score } from '../src/core/state';
+import {
+  awaitingTarget,
+  canAnswer,
+  createState,
+  currentCost,
+  reduce,
+  replay,
+  score,
+} from '../src/core/state';
 import type { Action } from '../src/core/events';
 import { mulberry32 } from '../src/core/rng';
 import { Driver, handLevel, types } from './helpers';
@@ -193,8 +201,12 @@ describe('дверь (2.4)', () => {
   it('механизм щёлкает каждые 10%, отсчёт 10…1', () => {
     const d = new Driver(handLevel({ cols: 5, rows: 4, doorCol: 2 })).start();
     const ev = d.tick(d.state.D - 1);
-    expect(ev.filter((e) => e.type === 'DOOR_NOTCH').map((e) => (e as { n: number }).n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    expect(ev.filter((e) => e.type === 'COUNTDOWN').map((e) => (e as { n: number }).n)).toEqual([10, 9, 8, 7, 6, 5, 4, 3, 2, 1]);
+    expect(ev.filter((e) => e.type === 'DOOR_NOTCH').map((e) => (e as { n: number }).n)).toEqual([
+      1, 2, 3, 4, 5, 6, 7, 8, 9,
+    ]);
+    expect(ev.filter((e) => e.type === 'COUNTDOWN').map((e) => (e as { n: number }).n)).toEqual([
+      10, 9, 8, 7, 6, 5, 4, 3, 2, 1,
+    ]);
   });
 });
 
@@ -275,7 +287,11 @@ describe('детерминизм (13.3.5)', () => {
     const level = handLevel({ cols: 5, rows: 4, doorCol: 2, items: [[2, 1, Item.Coin]] });
     const s0 = reduce(createState(level, { tMed: 5000, p: 0.8 }), { type: 'START' }).state;
     const snapshot = JSON.stringify({ ...s0, level: null });
-    const s1 = reduce(reduce(s0, { type: 'SET_TARGET', cell: 7 }).state, { type: 'ANSWER', correct: true, timeMs: 1 }).state;
+    const s1 = reduce(reduce(s0, { type: 'SET_TARGET', cell: 7 }).state, {
+      type: 'ANSWER',
+      correct: true,
+      timeMs: 1,
+    }).state;
     expect(JSON.stringify({ ...s0, level: null })).toBe(snapshot);
     expect(s1.bag.length).toBe(1);
   });

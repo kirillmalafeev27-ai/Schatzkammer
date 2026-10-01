@@ -29,6 +29,7 @@ uniform vec4 uVignette;                  // сила, радиус, пульс, 
 uniform vec3 uVignetteColor;
 uniform float uDebug;
 uniform float uGlow;
+uniform float uGel;
 
 // Ступень с растром: в полосе вокруг порога пиксель внутри точки получает верхнюю ступень.
 float stepWithDots(float lum, float lo, float hi, float thr, vec2 p) {
@@ -59,6 +60,10 @@ void main () {
   }
   float lum = max(light.r, max(light.g, light.b));
   vec3 hue = light / max(lum, 0.001);
+  // Цвет одних источников, без эмбиента: им окрашивается верхняя ступень.
+  vec3 pl = max(light - uAmbient, vec3(0.0));
+  float plum = max(pl.r, max(pl.g, pl.b));
+  vec3 phue = plum > 0.001 ? pl / plum : hue;
   bool inField = p.x >= uPlayfield.x && p.y >= uPlayfield.y && p.x <= uPlayfield.z && p.y <= uPlayfield.w;
   if (inField && lum < uFloorMin) {
     // Пол не падает на нижнюю ступень; поднятый свет — нейтрально-тёплый, чтобы не грязнить цвета.
@@ -74,8 +79,13 @@ void main () {
   vec3 tint = mix(vec3(1.0), hue, uTint);
   vec3 col = scene.rgb * tint * q;
   // На верхней ступени свет «красит» поверхность своим цветом — пятна светятся, а не сереют.
+  // Гель: яркость поверхности сохраняется, оттенок тянется к цвету источника — холодные плиты
+  // под факелом становятся тёплыми, а не розово-серыми.
   float lit = clamp((q - uSteps.y) / max(0.001, uSteps.z - uSteps.y), 0.0, 1.0);
-  col += hue * lit * uGlow;
+  vec3 lw = vec3(0.299, 0.587, 0.114);
+  vec3 gel = dot(col, lw) * phue / max(dot(phue, lw), 0.05);
+  col = mix(col, gel, lit * uGel);
+  col += phue * lit * uGlow;
   // Самосветящиеся пиксели (альфа обнулена режимом EMISSIVE) свет не затемняет.
   float emissive = clamp(1.0 - scene.a, 0.0, 1.0);
   col = mix(col, scene.rgb * 1.04, emissive);
@@ -119,6 +129,7 @@ export class ComicLightController extends Phaser.Filters.Controller {
   vignetteColor: [number, number, number] = [0.1, 0.05, 0.12];
   debug = 0;
   glow: number = balance.light.glow;
+  gel: number = balance.light.gel;
   steps: number[] = [...balance.light.steps];
   thresholds: number[] = [...balance.light.thresholds];
   /** Перевод мира в пиксели текстуры камеры. */
@@ -137,7 +148,10 @@ export class FilterComicLight extends Phaser.Renderer.WebGL.RenderNodes.BaseFilt
     super('FilterComicLight', manager, undefined, FRAG);
   }
 
-  override setupUniforms(controller: Phaser.Filters.Controller, drawingContext: Phaser.Renderer.WebGL.DrawingContext): void {
+  override setupUniforms(
+    controller: Phaser.Filters.Controller,
+    drawingContext: Phaser.Renderer.WebGL.DrawingContext,
+  ): void {
     const c = controller as ComicLightController;
     const pm = this.programManager;
     const n = Math.min(MAX_LIGHTS, c.lights.length);
@@ -165,7 +179,12 @@ export class FilterComicLight extends Phaser.Renderer.WebGL.RenderNodes.BaseFilt
     pm.setUniform('uLightColor[0]', this.colBuf);
     pm.setUniform('uLightCount', n);
     pm.setUniform('uAmbient', c.ambient);
-    pm.setUniform('uPlayfield', [c.playfield[0] * sx, c.playfield[1] * sy, c.playfield[2] * sx, c.playfield[3] * sy]);
+    pm.setUniform('uPlayfield', [
+      c.playfield[0] * sx,
+      c.playfield[1] * sy,
+      c.playfield[2] * sx,
+      c.playfield[3] * sy,
+    ]);
     pm.setUniform('uFloorMin', c.floorMin);
     pm.setUniform('uSteps', c.steps);
     pm.setUniform('uThresholds', c.thresholds);
@@ -176,6 +195,7 @@ export class FilterComicLight extends Phaser.Renderer.WebGL.RenderNodes.BaseFilt
     pm.setUniform('uVignetteColor', c.vignetteColor);
     pm.setUniform('uDebug', c.debug);
     pm.setUniform('uGlow', c.glow);
+    pm.setUniform('uGel', c.gel);
   }
 }
 

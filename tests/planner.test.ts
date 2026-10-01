@@ -17,7 +17,12 @@ describe('планировщик', () => {
       [6, 0, Item.Coin],
     ],
   });
-  const planner = createPlanner({ g: lvl.g, blocked: lvl.blocked, items: lvl.items, start: startIndex(lvl.g) });
+  const planner = createPlanner({
+    g: lvl.g,
+    blocked: lvl.blocked,
+    items: lvl.items,
+    start: startIndex(lvl.g),
+  });
 
   it('без бюджета на дорогу домой план невыполним', () => {
     expect(planner.best(0.5).feasible).toBe(false);

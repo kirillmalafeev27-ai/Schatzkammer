@@ -89,12 +89,21 @@ export class PathPreview {
   /**
    * Перерисовать следы. heroCell — клетка героя (над ней следы не рисуются, чтобы не закрыть голову).
    */
-  update(dt: number, est: RouteEstimate | null, hero: number, target: number | null, mode: TrailMode, hintsOn: boolean): void {
+  update(
+    dt: number,
+    est: RouteEstimate | null,
+    hero: number,
+    target: number | null,
+    mode: TrailMode,
+    hintsOn: boolean,
+  ): void {
     this.time += dt;
     this.target = target;
     if (!this.visible) return;
     const show = hintsOn && mode !== 'none' && est != null;
-    const key = show ? `${hero}|${target}|${est.level}|${est.toTarget?.path.join(',')}|${est.toExit.path.join(',')}|${mode}` : `none|${target}`;
+    const key = show
+      ? `${hero}|${target}|${est.level}|${est.toTarget?.path.join(',')}|${est.toExit.path.join(',')}|${mode}`
+      : `none|${target}`;
     if (key !== this.lastKey) {
       this.lastKey = key;
       for (let i = 0; i < this.used; i++) this.pool[i].setVisible(false);
@@ -116,10 +125,17 @@ export class PathPreview {
       for (let i = this.used; i < this.pool.length; i++) this.pool[i].setVisible(false);
       // Значок с числом шагов у цели.
       if (target != null) {
-        const steps = est?.toTarget?.reachable ? est.toTarget.path.length : est && target === exitIndex(this.g) ? est.toExit.path.length : 0;
+        const steps = est?.toTarget?.reachable
+          ? est.toTarget.path.length
+          : est && target === exitIndex(this.g)
+            ? est.toExit.path.length
+            : 0;
         const c = this.markerPos(target);
         this.badge.setPosition(c.x + CELL * 0.3, c.y - CELL * 0.32).setVisible(steps > 0);
-        this.badgeText.setText(String(steps)).setPosition(this.badge.x, this.badge.y).setVisible(steps > 0);
+        this.badgeText
+          .setText(String(steps))
+          .setPosition(this.badge.x, this.badge.y)
+          .setVisible(steps > 0);
         this.badgeText.setScale(steps > 9 ? 0.8 : 1);
       } else {
         this.badge.setVisible(false);
@@ -133,7 +149,13 @@ export class PathPreview {
     return cellCenter(this.g, cell);
   }
 
-  private stepPrints(from: number, to: number, hero: number, style: RiskLevel | 'plain', alpha: number): void {
+  private stepPrints(
+    from: number,
+    to: number,
+    hero: number,
+    style: RiskLevel | 'plain',
+    alpha: number,
+  ): void {
     const a = cellXY(this.g, from);
     const b = cellXY(this.g, to);
     const h = cellXY(this.g, hero);
@@ -168,7 +190,10 @@ export class PathPreview {
     this.glow.setVisible(true).setPosition(c.x, cy);
     const pulse = this.reduced ? 0.6 : 0.5 + 0.25 * Math.sin(this.time / 220);
     this.glow.setAlpha(pulse);
-    this.glow.setScale(this.art.baseScale(SPR.targetGlow) * (w / (CELL - 14)), this.art.baseScale(SPR.targetGlow) * (h / (CELL - 14)));
+    this.glow.setScale(
+      this.art.baseScale(SPR.targetGlow) * (w / (CELL - 14)),
+      this.art.baseScale(SPR.targetGlow) * (h / (CELL - 14)),
+    );
     // Бегущий пунктир тушью по контуру.
     const x0 = c.x - w / 2;
     const y0 = cy - h / 2;

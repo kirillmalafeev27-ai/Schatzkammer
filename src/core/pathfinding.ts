@@ -32,7 +32,13 @@ export function bfsDistances(g: GridShape, blocked: Blocked, from: number): Int3
  * Кратчайший путь от `from` до `to` (без `from`, с `to`), с наименьшим числом предметов по пути.
  * Пустой массив — уже на месте; null — недостижимо.
  */
-export function findPath(g: GridShape, blocked: Blocked, items: ArrayLike<number>, from: number, to: number): number[] | null {
+export function findPath(
+  g: GridShape,
+  blocked: Blocked,
+  items: ArrayLike<number>,
+  from: number,
+  to: number,
+): number[] | null {
   if (from === to) return [];
   if (blocked[to] || blocked[from]) return null;
   const n = cellCount(g);

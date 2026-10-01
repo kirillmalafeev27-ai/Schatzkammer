@@ -95,6 +95,7 @@ export class ArtFactory {
   }
 
   private bake(key: string, b: Bake, scale: number): void {
+    const t0 = performance.now();
     const pw = Math.ceil(b.w * scale);
     const ph = Math.ceil(b.h * scale);
     const { canvas, ctx } = makeCanvas(nextPow2(pw), nextPow2(ph));
@@ -107,6 +108,7 @@ export class ArtFactory {
     const tex = this.textures.addCanvas(key, canvas);
     tex?.add('main', 0, 0, 0, pw, ph);
     this.baked.set(key, { key, x: b.x, y: b.y, w: b.w, h: b.h, scale });
+    this.timings[key] = performance.now() - t0;
   }
 
   frame(name: string): FrameMeta {
@@ -134,7 +136,17 @@ export class ArtFactory {
     const key = `sfx${this.sfxCount++}`;
     const tex = this.textures.addCanvas(key, canvas);
     tex?.add('main', 0, 0, 0, pw, ph);
-    const meta: FrameMeta = { key, frame: 'main', x: 0, y: 0, w: pw, h: ph, ox: spec.ox / spec.w, oy: spec.oy / spec.h, scale };
+    const meta: FrameMeta = {
+      key,
+      frame: 'main',
+      x: 0,
+      y: 0,
+      w: pw,
+      h: ph,
+      ox: spec.ox / spec.w,
+      oy: spec.oy / spec.h,
+      scale,
+    };
     this.sfxCache.set(id, meta);
     return meta;
   }

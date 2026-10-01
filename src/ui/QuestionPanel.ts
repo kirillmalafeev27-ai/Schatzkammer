@@ -46,9 +46,19 @@ export class QuestionPanel {
     this.pipsEl = h('span', { class: 'tz-pips-boots', 'aria-hidden': 'true' });
     this.pipsLabel = h('span', { class: 'tz-pips-label' }, ru.stepCost(1));
     const pips = h('div', { class: 'tz-pips', role: 'status' }, this.pipsEl, this.pipsLabel);
-    const head = h('div', { class: 'tz-q-head' }, h('div', { class: 'tz-caption tz-q-title' }, 'Вопрос на шаг'), pips);
+    const head = h(
+      'div',
+      { class: 'tz-q-head' },
+      h('div', { class: 'tz-caption tz-q-title' }, 'Вопрос на шаг'),
+      pips,
+    );
     this.promptText = h('span', { class: 'tz-prompt-text' });
-    this.prompt = h('div', { class: 'tz-caption tz-prompt', id: 'tz-prompt' }, h('span', { class: 'tz-prompt-label' }, 'Выбери верный ответ'), this.promptText);
+    this.prompt = h(
+      'div',
+      { class: 'tz-caption tz-prompt', id: 'tz-prompt' },
+      h('span', { class: 'tz-prompt-label' }, 'Выбери верный ответ'),
+      this.promptText,
+    );
     this.options = h('div', { class: 'tz-options' });
     const await_ = h('div', { class: 'tz-caption tz-await' }, ru.chooseTarget);
     this.body = h('div', { class: 'tz-q-body' }, this.prompt, this.options, await_);
@@ -59,7 +69,12 @@ export class QuestionPanel {
     const foot = h('div', { class: 'tz-q-foot' }, ru.footerControls);
     this.el = h(
       'section',
-      { class: 'tz-panel tz-question', role: 'group', 'aria-label': ru.questionGroup, 'aria-describedby': 'tz-prompt' },
+      {
+        class: 'tz-panel tz-question',
+        role: 'group',
+        'aria-label': ru.questionGroup,
+        'aria-describedby': 'tz-prompt',
+      },
       head,
       this.body,
       ready,
@@ -165,20 +180,60 @@ export class QuestionPanel {
     });
     this.options.replaceChildren(...this.buttons);
     this.options.dataset.count = String(q.options.length);
-    this.fitPrompt();
+    this.fit();
     this.live.textContent = q.prompt.replace(/___/g, '…');
   }
 
-  /** Если текст не помещается, шрифт ужимается с 24 до 16 px. */
-  fitPrompt(): void {
+  /** Подогнать задание и варианты под текущий размер панели. */
+  fit(): void {
+    this.fitPrompt();
+    this.fitOptions();
+  }
+
+  /** Если текст не помещается в две строки, шрифт ужимается с 24 до 16 px. */
+  private fitPrompt(): void {
     const L = balance.layout;
     let size = L.promptFontMax;
     this.el.style.setProperty('--q-font', `${size}px`);
     const el = this.prompt;
     let guard = 0;
-    while (size > L.promptFontMin && (el.scrollWidth > el.clientWidth + 1 || this.promptText.offsetHeight > size * 2.6) && guard++ < 10) {
+    while (
+      size > L.promptFontMin &&
+      (el.scrollWidth > el.clientWidth + 1 || this.promptText.offsetHeight > size * 2.6) &&
+      guard++ < 10
+    ) {
       size -= 2;
       this.el.style.setProperty('--q-font', `${size}px`);
+    }
+  }
+
+  /**
+   * Длинное немецкое слово не вылезает из кнопки: шрифт ужимается, пока слово не встанет целиком,
+   * и только на минимальном размере слово переносится по буквам. Размер общий для всех вариантов.
+   */
+  private fitOptions(): void {
+    const L = balance.layout;
+    const fits = (b: HTMLElement, text: HTMLElement) =>
+      text.scrollWidth <= text.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1;
+    const items: { b: HTMLElement; text: HTMLElement }[] = [];
+    let common = Infinity;
+    for (const b of this.buttons) {
+      const text = b.querySelector<HTMLElement>('.tz-opt-text');
+      if (!text) continue;
+      b.style.fontSize = '';
+      b.classList.remove('is-tight');
+      let size = parseFloat(getComputedStyle(b).fontSize) || L.optionFontMax;
+      let guard = 0;
+      while (!fits(b, text) && size > L.optionFontMin && guard++ < 30) {
+        size = Math.max(L.optionFontMin, size - 1.5);
+        b.style.fontSize = `${size}px`;
+      }
+      common = Math.min(common, size);
+      items.push({ b, text });
+    }
+    for (const { b, text } of items) {
+      b.style.fontSize = `${common}px`;
+      if (!fits(b, text)) b.classList.add('is-tight');
     }
   }
 
@@ -221,7 +276,11 @@ export class QuestionPanel {
       const boots: HTMLElement[] = [];
       for (let i = 0; i < cost; i++) {
         const full = i < pips;
-        const img = h('img', { class: `tz-pip${full ? ' is-full' : ''}`, src: full ? this.icons.pipFull : this.icons.pipEmpty, alt: '' });
+        const img = h('img', {
+          class: `tz-pip${full ? ' is-full' : ''}`,
+          src: full ? this.icons.pipFull : this.icons.pipEmpty,
+          alt: '',
+        });
         if (full && i < prevHave) img.classList.remove('is-full');
         boots.push(img);
       }

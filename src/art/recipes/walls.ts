@@ -49,7 +49,11 @@ function stalactite(ctx: Ctx, rng: Rng, x: number, y: number, len: number, w: nu
 
 /** Друза бирюзовых кристаллов. */
 export function crystalCluster(ctx: Ctx, rng: Rng, cx: number, cy: number, s: number): void {
-  const tones: Tones = { base: palette.crystal.base, shadow: shiftHex(palette.crystal.base, 0.62, 12), light: palette.crystal.glow };
+  const tones: Tones = {
+    base: palette.crystal.base,
+    shadow: shiftHex(palette.crystal.base, 0.62, 12),
+    light: palette.crystal.glow,
+  };
   // Гнездо в скале.
   const nest = blob(rng, 44 * s, 22 * s, { cx, cy: cy + 8 * s, points: 8 });
   fillPath(ctx, nest, shiftHex(palette.rock.shadow, 0.8));
@@ -103,7 +107,11 @@ export function crystalCluster(ctx: Ctx, rng: Rng, cx: number, cy: number, s: nu
 
 /** Резная плита с глифами у двери. */
 function carvedPanel(ctx: Ctx, rng: Rng, x: number, y: number, w: number, h: number): void {
-  const tones: Tones = { base: shiftHex(palette.doorStone.base, 0.8, 6), shadow: shiftHex(palette.doorStone.shadow, 0.78, 8), light: shiftHex(palette.doorStone.light, 0.85, 4) };
+  const tones: Tones = {
+    base: shiftHex(palette.doorStone.base, 0.8, 6),
+    shadow: shiftHex(palette.doorStone.shadow, 0.78, 8),
+    light: shiftHex(palette.doorStone.light, 0.85, 4),
+  };
   const p = roughRect(rng, x, y, w, h, 6, 1.5);
   celShade(ctx, p, tones, 7, { lightK: 3 });
   ctx.save();
@@ -213,7 +221,12 @@ export const WALL_MARGIN = { x: 3 * CELL, top: 2 * CELL };
 
 export function wallsBake(geom: WorldGeom, level: GeneratedLevel): Bake {
   const b = geom.bounds;
-  const ext = { x: b.x - WALL_MARGIN.x, y: b.y - WALL_MARGIN.top, w: b.w + WALL_MARGIN.x * 2, h: b.h + WALL_MARGIN.top };
+  const ext = {
+    x: b.x - WALL_MARGIN.x,
+    y: b.y - WALL_MARGIN.top,
+    w: b.w + WALL_MARGIN.x * 2,
+    h: b.h + WALL_MARGIN.top,
+  };
   return {
     ...ext,
     draw(ctx) {
@@ -234,43 +247,85 @@ export function wallsBake(geom: WorldGeom, level: GeneratedLevel): Bake {
       ctx.fillRect(left, ext.y, ext.w, -ext.y + 10);
       // Своды над стеной: крупные тёмные глыбы.
       for (let x = left - 40; x < right + 40; x += 70 + rng() * 50) {
-        rock(ctx, rng, 120 + rng() * 80, 90 + rng() * 60, tonesVar(rng, ROCK_FAR, 0.05, 3), { cx: x, cy: wallTop - 90 - rng() * 120, inkW: 4, specks: 0, cracks: 0 });
+        rock(ctx, rng, 120 + rng() * 80, 90 + rng() * 60, tonesVar(rng, ROCK_FAR, 0.05, 3), {
+          cx: x,
+          cy: wallTop - 90 - rng() * 120,
+          inkW: 4,
+          specks: 0,
+          cracks: 0,
+        });
       }
       // Дальний слой стены.
       for (let x = left - 30; x < right + 30; x += 48 + rng() * 30) {
-        rock(ctx, rng, 74 + rng() * 50, 62 + rng() * 40, tonesVar(rng, ROCK_FAR, 0.05, 3), { cx: x, cy: wallTop + 18 + rng() * 40, inkW: 4.4 });
+        rock(ctx, rng, 74 + rng() * 50, 62 + rng() * 40, tonesVar(rng, ROCK_FAR, 0.05, 3), {
+          cx: x,
+          cy: wallTop + 18 + rng() * 40,
+          inkW: 4.4,
+        });
       }
       // Средний слой.
       for (let x = left - 20; x < right + 30; x += 54 + rng() * 32) {
         if (x > masonL - 20 && x < masonR + 20) continue;
-        rock(ctx, rng, 84 + rng() * 50, 66 + rng() * 34, tonesVar(rng, ROCK_MID, 0.05, 3), { cx: x, cy: wallTop + 92 + rng() * 34, inkW: 5 });
+        rock(ctx, rng, 84 + rng() * 50, 66 + rng() * 34, tonesVar(rng, ROCK_MID, 0.05, 3), {
+          cx: x,
+          cy: wallTop + 92 + rng() * 34,
+          inkW: 5,
+        });
       }
       // Ближний слой — у пола, вне кладки у двери.
       for (let x = left - 10; x < right + 30; x += 58 + rng() * 34) {
         if (x > masonL - 30 && x < masonR + 30) continue;
         const w = 88 + rng() * 46;
         const h = 62 + rng() * 28;
-        rock(ctx, rng, w, h, tonesVar(rng, ROCK, 0.06, 3), { cx: x, cy: -h * 0.38 + rng() * 6, inkW: 6.5, flatBottom: 0.25, hatchDeep: rng() < 0.3 });
+        rock(ctx, rng, w, h, tonesVar(rng, ROCK, 0.06, 3), {
+          cx: x,
+          cy: -h * 0.38 + rng() * 6,
+          inkW: 6.5,
+          flatBottom: 0.25,
+          hatchDeep: rng() < 0.3,
+        });
       }
       // Кладка храма вокруг двери: тёсаные блоки рядами вперевязку.
-      const mason: Tones = { base: shiftHex(palette.rock.base, 1.05, 10), shadow: palette.rock.shadow, light: shiftHex(palette.rock.light, 1.02, 6) };
+      const mason: Tones = {
+        base: shiftHex(palette.rock.base, 1.05, 10),
+        shadow: palette.rock.shadow,
+        light: shiftHex(palette.rock.light, 1.02, 6),
+      };
       const rowH = 34;
       let row = 0;
       for (let y = -rowH; y > wallTop - 4; y -= rowH, row++) {
         let x = masonL - (row % 2 ? 22 : 0);
         while (x < masonR) {
           const w = 40 + rng() * 22;
-          block(ctx, rng, x + 2, y + 2, Math.min(w, masonR - x) - 4, rowH - 4, tonesVar(rng, mason, 0.06, 4), 4);
+          block(
+            ctx,
+            rng,
+            x + 2,
+            y + 2,
+            Math.min(w, masonR - x) - 4,
+            rowH - 4,
+            tonesVar(rng, mason, 0.06, 4),
+            4,
+          );
           x += w;
         }
       }
       // Сталактиты: разной длины, гроздьями.
-      for (let x = left; x < right; ) {
+      for (let x = left; x < right;) {
         const big = rng() < 0.25;
-        stalactite(ctx, rng, x, wallTop - 6, big ? 60 + rng() * 50 : 20 + rng() * 30, big ? 26 + rng() * 12 : 12 + rng() * 10, tonesVar(rng, ROCK_FAR, 0.05, 2));
+        stalactite(
+          ctx,
+          rng,
+          x,
+          wallTop - 6,
+          big ? 60 + rng() * 50 : 20 + rng() * 30,
+          big ? 26 + rng() * 12 : 12 + rng() * 10,
+          tonesVar(rng, ROCK_FAR, 0.05, 2),
+        );
         x += big ? 40 + rng() * 30 : 14 + rng() * 46;
       }
-      for (let i = 0; i < 4; i++) root(ctx, rng, left + 120 + rng() * (ext.w - 240), wallTop - 10, 40 + rng() * 50);
+      for (let i = 0; i < 4; i++)
+        root(ctx, rng, left + 120 + rng() * (ext.w - 240), wallTop - 10, 40 + rng() * 50);
       ctx.restore();
 
       // Ниша для песочных часов.
@@ -298,11 +353,18 @@ export function wallsBake(geom: WorldGeom, level: GeneratedLevel): Bake {
         ctx.beginPath();
         ctx.ellipse(t.x, t.y - 46, r * 0.6, r, 0, 0, Math.PI * 2);
         ctx.clip();
-        halftone(ctx, rgba(palette.ink, 0.55), { region: { x: t.x - r, y: t.y - 46 - r, w: r * 2, h: r * 2 }, spacing: 6, rMin: 2.4, rMax: 0, dir: { x: 0, y: 1 } });
+        halftone(ctx, rgba(palette.ink, 0.55), {
+          region: { x: t.x - r, y: t.y - 46 - r, w: r * 2, h: r * 2 },
+          spacing: 6,
+          rMin: 2.4,
+          rMax: 0,
+          dir: { x: 0, y: 1 },
+        });
         ctx.restore();
       }
 
-      for (const c of geom.crystals) crystalCluster(ctx, mulberry32(hashSeed(level.usedSeed, Math.round(c.x))), c.x, c.y, c.s);
+      for (const c of geom.crystals)
+        crystalCluster(ctx, mulberry32(hashSeed(level.usedSeed, Math.round(c.x))), c.x, c.y, c.s);
 
       cobweb(ctx, -geom.sideW + 2, wallTop + 2, 50, 1);
       cobweb(ctx, geom.floorW + geom.sideW - 2, wallTop + 2, 46, -1);
@@ -323,19 +385,51 @@ export function wallsBake(geom: WorldGeom, level: GeneratedLevel): Bake {
             const near = pass === 1;
             const w = near ? geom.sideW * 2.2 + rng() * 30 : 110 + rng() * 70;
             const h = 54 + rng() * 30;
-            const cx = near ? (side < 0 ? -geom.sideW * 0.5 : geom.floorW + geom.sideW * 0.5) : x0 + rng() * (x1 - x0);
+            const cx = near
+              ? side < 0
+                ? -geom.sideW * 0.5
+                : geom.floorW + geom.sideW * 0.5
+              : x0 + rng() * (x1 - x0);
             if (!near && Math.abs(cx - (side < 0 ? 0 : geom.floorW)) < geom.sideW * 1.6) continue;
-            rock(ctx, rng, w, h, tonesVar(rng, near ? (rng() < 0.5 ? ROCK : ROCK_MID) : ROCK_FAR, 0.06, 3), { cx, cy: y + h / 2, inkW: near ? 5.5 : 4.4 });
+            rock(ctx, rng, w, h, tonesVar(rng, near ? (rng() < 0.5 ? ROCK : ROCK_MID) : ROCK_FAR, 0.06, 3), {
+              cx,
+              cy: y + h / 2,
+              inkW: near ? 5.5 : 4.4,
+            });
           }
         }
         ctx.restore();
         const ex = side < 0 ? 0 : geom.floorW;
-        line(ctx, [{ x: ex, y: -4 }, { x: ex, y: geom.floorH }], 5, palette.ink);
+        line(
+          ctx,
+          [
+            { x: ex, y: -4 },
+            { x: ex, y: geom.floorH },
+          ],
+          5,
+          palette.ink,
+        );
       }
 
       // Кромка северной стены у пола и мох на стыке.
-      line(ctx, [{ x: left, y: 1 }, { x: o.x - 2, y: 1 }], 4, palette.ink);
-      line(ctx, [{ x: o.x + o.w + 2, y: 1 }, { x: right, y: 1 }], 4, palette.ink);
+      line(
+        ctx,
+        [
+          { x: left, y: 1 },
+          { x: o.x - 2, y: 1 },
+        ],
+        4,
+        palette.ink,
+      );
+      line(
+        ctx,
+        [
+          { x: o.x + o.w + 2, y: 1 },
+          { x: right, y: 1 },
+        ],
+        4,
+        palette.ink,
+      );
       for (let i = 0; i < 6; i++) moss(ctx, rng, rng() * geom.floorW, -4 + rng() * 6, 7 + rng() * 4);
 
       // Проём двери — прозрачный: за ним небо и джунгли.
@@ -365,12 +459,22 @@ export function ledgeBake(geom: WorldGeom, level: GeneratedLevel): Bake {
       ctx.fillRect(x0, geom.floorH + 6, w, h);
       // Ниже уступа — темнота и дальние глыбы.
       for (let x = x0 - 20; x < x0 + w + 40; x += 80 + rng() * 60) {
-        rock(ctx, rng, 130 + rng() * 60, 80 + rng() * 40, tonesVar(rng, ROCK_FAR, 0.05, 3), { cx: x, cy: geom.floorH + geom.southH + 50 + rng() * 60, inkW: 4, cracks: 0 });
+        rock(ctx, rng, 130 + rng() * 60, 80 + rng() * 40, tonesVar(rng, ROCK_FAR, 0.05, 3), {
+          cx: x,
+          cy: geom.floorH + geom.southH + 50 + rng() * 60,
+          inkW: 4,
+          cracks: 0,
+        });
       }
       for (let x = x0 - 20; x < x0 + w + 30; x += 46 + rng() * 26) {
         const ww = 74 + rng() * 40;
         const hh = 42 + rng() * 16;
-        rock(ctx, rng, ww, hh, tonesVar(rng, ROCK, 0.06, 3), { cx: x, cy: geom.floorH + hh * 0.5 + 4, inkW: 6, flatBottom: 0.2 });
+        rock(ctx, rng, ww, hh, tonesVar(rng, ROCK, 0.06, 3), {
+          cx: x,
+          cy: geom.floorH + hh * 0.5 + 4,
+          inkW: 6,
+          flatBottom: 0.2,
+        });
       }
       for (let i = 0; i < 4; i++) moss(ctx, rng, b.x + rng() * b.w, geom.floorH + 8 + rng() * 8, 8);
       void stone;
@@ -399,7 +503,15 @@ export function caveBake(geom: WorldGeom, level: GeneratedLevel): Bake {
       }
       // Сталактиты сверху.
       for (let x = box.x; x < box.x + box.w; x += 60 + rng() * 90) {
-        stalactite(ctx, rng, x, box.y + m * 0.6 + rng() * 80, 60 + rng() * 90, 26 + rng() * 22, tonesFrom(shiftHex(palette.rockFar, 0.7)));
+        stalactite(
+          ctx,
+          rng,
+          x,
+          box.y + m * 0.6 + rng() * 80,
+          60 + rng() * 90,
+          26 + rng() * 22,
+          tonesFrom(shiftHex(palette.rockFar, 0.7)),
+        );
       }
       // Редкие тусклые кристаллы.
       for (let i = 0; i < 9; i++) {

@@ -13,7 +13,9 @@ describe('сетка', () => {
   });
   it('только 4 направления', () => {
     const nb = neighbors(g, cellIndex(g, 2, 2));
-    expect(nb.sort()).toEqual([cellIndex(g, 2, 1), cellIndex(g, 3, 2), cellIndex(g, 2, 3), cellIndex(g, 1, 2)].sort());
+    expect(nb.sort()).toEqual(
+      [cellIndex(g, 2, 1), cellIndex(g, 3, 2), cellIndex(g, 2, 3), cellIndex(g, 1, 2)].sort(),
+    );
   });
 });
 

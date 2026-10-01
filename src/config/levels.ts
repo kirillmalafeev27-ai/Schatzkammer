@@ -17,6 +17,7 @@ export interface LevelConfig {
   trail: TrailMode;
 }
 
+// prettier-ignore
 export const levels: readonly LevelConfig[] = [
   { id: 1, doorAnswers: 22, coins: 14, gems: 3, obstacles: 3, sandStartFrac: 0.35, sandEndFrac: 0.9, sandMinDistFrac: 0.55, trail: 'risk' },
   { id: 2, doorAnswers: 22, coins: 12, gems: 4, obstacles: 4, sandStartFrac: 0.3, sandEndFrac: 0.85, sandMinDistFrac: 0.5, trail: 'risk' },
@@ -38,7 +39,13 @@ export function getLevel(id: number): LevelConfig {
 /**
  * Если зал меньше 9 × 8, число предметов и препятствий уменьшается пропорционально площади.
  */
-export function scaleLevelForGrid(level: LevelConfig, cols: number, rows: number, baseCols = 9, baseRows = 8): LevelConfig {
+export function scaleLevelForGrid(
+  level: LevelConfig,
+  cols: number,
+  rows: number,
+  baseCols = 9,
+  baseRows = 8,
+): LevelConfig {
   const k = Math.min(1, (cols * rows) / (baseCols * baseRows));
   if (k >= 1) return level;
   return {

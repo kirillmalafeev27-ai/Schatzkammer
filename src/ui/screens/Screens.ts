@@ -17,7 +17,8 @@ export class Screens {
     this.hide();
     this.current = el;
     this.host.append(el);
-    const focusable = el.querySelector<HTMLElement>('[data-autofocus]') ?? el.querySelector<HTMLElement>('button');
+    const focusable =
+      el.querySelector<HTMLElement>('[data-autofocus]') ?? el.querySelector<HTMLElement>('button');
     focusable?.focus({ preventScroll: true });
   }
 
@@ -49,9 +50,17 @@ function lockSvg(): SVGSVGElement {
 }
 
 const starRow = (n: number, big = false): HTMLElement =>
-  h('div', { class: big ? 'tz-stars-big' : 'tz-stars', role: 'img', 'aria-label': ru.stars(n) }, ...[0, 1, 2].map((i) => h('span', { class: `tz-star${i < n ? ' is-on' : ''}` })));
+  h(
+    'div',
+    { class: big ? 'tz-stars-big' : 'tz-stars', role: 'img', 'aria-label': ru.stars(n) },
+    ...[0, 1, 2].map((i) => h('span', { class: `tz-star${i < n ? ' is-on' : ''}` })),
+  );
 
-export function menuScreen(opts: { onPlay: () => void; onLevels: () => void; onSettings: () => void }): HTMLElement {
+export function menuScreen(opts: {
+  onPlay: () => void;
+  onLevels: () => void;
+  onSettings: () => void;
+}): HTMLElement {
   return h(
     'div',
     { class: 'tz-screen is-clear', 'data-screen': 'menu' },
@@ -61,23 +70,40 @@ export function menuScreen(opts: { onPlay: () => void; onLevels: () => void; onS
       h('h1', { class: 'tz-title' }, ru.title),
       h('div', { class: 'tz-subtitle', lang: 'de' }, ru.subtitle),
       h('div', { class: 'tz-caption tz-tagline' }, ru.tagline),
-      h('button', { class: 'tz-btn tz-play', type: 'button', 'data-autofocus': true, onclick: opts.onPlay }, ru.play),
+      h(
+        'button',
+        { class: 'tz-btn tz-play', type: 'button', 'data-autofocus': true, onclick: opts.onPlay },
+        ru.play,
+      ),
       h(
         'div',
         { class: 'tz-menu-links' },
         h('button', { class: 'tz-btn', type: 'button', onclick: opts.onLevels }, ru.levels),
         h('button', { class: 'tz-btn', type: 'button', onclick: opts.onSettings }, ru.settings),
       ),
-      h('div', { class: 'tz-caption tz-tagline', style: 'font-size:13px;transform:rotate(-1deg)' }, ru.menuHint),
+      h(
+        'div',
+        { class: 'tz-caption tz-tagline', style: 'font-size:13px;transform:rotate(-1deg)' },
+        ru.menuHint,
+      ),
     ),
   );
 }
 
-export function levelsScreen(save: SaveData, opts: { onPick: (id: number) => void; onBack: () => void; doorIcon?: string }): HTMLElement {
+export function levelsScreen(
+  save: SaveData,
+  opts: { onPick: (id: number) => void; onBack: () => void; doorIcon?: string },
+): HTMLElement {
   const cards = levels.map((l) => {
     const unlocked = save.isUnlocked(l.id);
     const pr = save.progress[l.id];
-    const meta = !unlocked ? ru.locked : l.id === ENDLESS_LEVEL_ID ? ru.endless : pr?.best ? ru.best(pr.best) : ' ';
+    const meta = !unlocked
+      ? ru.locked
+      : l.id === ENDLESS_LEVEL_ID
+        ? ru.endless
+        : pr?.best
+          ? ru.best(pr.best)
+          : ' ';
     return h(
       'button',
       {
@@ -103,12 +129,21 @@ export function levelsScreen(save: SaveData, opts: { onPick: (id: number) => voi
       { class: 'tz-card', style: 'max-width:720px' },
       h('div', { class: 'tz-caption tz-card-tag' }, ru.levels),
       h('div', { class: 'tz-levels' }, ...cards),
-      h('div', { class: 'tz-row is-end' }, h('button', { class: 'tz-btn', type: 'button', onclick: opts.onBack }, ru.back)),
+      h(
+        'div',
+        { class: 'tz-row is-end' },
+        h('button', { class: 'tz-btn', type: 'button', onclick: opts.onBack }, ru.back),
+      ),
     ),
   );
 }
 
-export function pauseScreen(opts: { onResume: () => void; onRestart: () => void; onSettings: () => void; onMenu: () => void }): HTMLElement {
+export function pauseScreen(opts: {
+  onResume: () => void;
+  onRestart: () => void;
+  onSettings: () => void;
+  onMenu: () => void;
+}): HTMLElement {
   return h(
     'div',
     { class: 'tz-screen', 'data-screen': 'pause' },
@@ -121,7 +156,11 @@ export function pauseScreen(opts: { onResume: () => void; onRestart: () => void;
       h(
         'div',
         { class: 'tz-row', style: 'justify-content:center' },
-        h('button', { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: opts.onResume }, ru.resume),
+        h(
+          'button',
+          { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: opts.onResume },
+          ru.resume,
+        ),
         h('button', { class: 'tz-btn', type: 'button', onclick: opts.onRestart }, ru.restart),
       ),
       h(
@@ -162,7 +201,13 @@ export function settingsScreen(o: SettingsOpts): HTMLElement {
         },
       }),
     );
-  const toggle = (label: string, value: boolean, set: (v: boolean) => void, disabled = false, note?: string) =>
+  const toggle = (
+    label: string,
+    value: boolean,
+    set: (v: boolean) => void,
+    disabled = false,
+    note?: string,
+  ) =>
     h(
       'label',
       { class: 'tz-setting' },
@@ -179,7 +224,13 @@ export function settingsScreen(o: SettingsOpts): HTMLElement {
         },
       }),
     );
-  const seg = (label: string, items: [string, string][], value: string, set: (v: string) => void, note?: string) => {
+  const seg = (
+    label: string,
+    items: [string, string][],
+    value: string,
+    set: (v: string) => void,
+    note?: string,
+  ) => {
     const wrap = h('div', { class: 'tz-seg', role: 'group', 'aria-label': label });
     const render = (v: string) => {
       wrap.replaceChildren(
@@ -201,7 +252,12 @@ export function settingsScreen(o: SettingsOpts): HTMLElement {
       );
     };
     render(value);
-    return h('div', { class: 'tz-setting' }, h('span', {}, label, note ? h('div', { class: 'tz-note' }, note) : null), wrap);
+    return h(
+      'div',
+      { class: 'tz-setting' },
+      h('span', {}, label, note ? h('div', { class: 'tz-note' }, note) : null),
+      wrap,
+    );
   };
   return h(
     'div',
@@ -233,7 +289,13 @@ export function settingsScreen(o: SettingsOpts): HTMLElement {
           },
           s.qualityAuto ? ru.qualityAutoNote : o.lightAvailable ? undefined : ru.webglMissing,
         ),
-        toggle(ru.trailHints, s.trailHints, (v) => (s.trailHints = v), !o.trailAvailable, o.trailAvailable ? undefined : ru.trailUnavailable),
+        toggle(
+          ru.trailHints,
+          s.trailHints,
+          (v) => (s.trailHints = v),
+          !o.trailAvailable,
+          o.trailAvailable ? undefined : ru.trailUnavailable,
+        ),
         seg(
           ru.sfxLanguage,
           [
@@ -245,7 +307,15 @@ export function settingsScreen(o: SettingsOpts): HTMLElement {
         ),
         h('p', { class: 'tz-note', style: 'margin:4px 0 0' }, ru.keyboardHelp),
       ),
-      h('div', { class: 'tz-row is-end', style: 'margin-top:16px' }, h('button', { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: o.onBack }, ru.back)),
+      h(
+        'div',
+        { class: 'tz-row is-end', style: 'margin-top:16px' },
+        h(
+          'button',
+          { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: o.onBack },
+          ru.back,
+        ),
+      ),
     ),
   );
 }
@@ -269,7 +339,10 @@ export interface ResultsData {
   narrowLayout: boolean;
 }
 
-export function resultsScreen(d: ResultsData, opts: { onAgain: () => void; onNext: () => void; onMenu: () => void; onTally: (i: number) => void }): HTMLElement {
+export function resultsScreen(
+  d: ResultsData,
+  opts: { onAgain: () => void; onNext: () => void; onMenu: () => void; onTally: (i: number) => void },
+): HTMLElement {
   const shot = h('div', { class: `tz-rp tz-rp-shot${d.escaped ? '' : ' is-lose'}` });
   if (d.snapshot) {
     d.snapshot.alt = '';
@@ -306,22 +379,40 @@ export function resultsScreen(d: ResultsData, opts: { onAgain: () => void; onNex
     stats,
   );
 
-  const panels = h('div', { class: `tz-results-panels${d.narrowLayout ? ' is-narrow' : ''}` }, shot, lootPanel, starPanel);
+  const panels = h(
+    'div',
+    { class: `tz-results-panels${d.narrowLayout ? ' is-narrow' : ''}` },
+    shot,
+    lootPanel,
+    starPanel,
+  );
   const buttons = h(
     'div',
     { class: 'tz-row', style: 'justify-content:center' },
-    h('button', { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: opts.onAgain }, ru.again),
-    d.hasNext ? h('button', { class: 'tz-btn is-dark', type: 'button', onclick: opts.onNext }, ru.next) : null,
+    h(
+      'button',
+      { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: opts.onAgain },
+      ru.again,
+    ),
+    d.hasNext
+      ? h('button', { class: 'tz-btn is-dark', type: 'button', onclick: opts.onNext }, ru.next)
+      : null,
     h('button', { class: 'tz-btn', type: 'button', onclick: opts.onMenu }, ru.toMenu),
   );
-  const root = h('div', { class: 'tz-screen', 'data-screen': 'results' }, h('div', { class: 'tz-results' }, panels, buttons));
+  const root = h(
+    'div',
+    { class: 'tz-screen', 'data-screen': 'results' },
+    h('div', { class: 'tz-results' }, panels, buttons),
+  );
 
   // Панели появляются по очереди; добыча летит по одной, счётчик ускоряется.
   const ps = [shot, lootPanel, starPanel];
   ps.forEach((p, i) => setTimeout(() => p.classList.add('is-in'), 80 + i * 260));
   if (!d.escaped) {
     // Что осталось в сокровищнице: добыча серыми силуэтами.
-    d.bag.forEach((it, i) => setTimeout(() => loot.append(h('img', { src: it.src, alt: '', class: 'is-lost' })), 500 + i * 60));
+    d.bag.forEach((it, i) =>
+      setTimeout(() => loot.append(h('img', { src: it.src, alt: '', class: 'is-lost' })), 500 + i * 60),
+    );
   }
   if (d.escaped) {
     let sum = 0;
@@ -345,12 +436,22 @@ export function loadingScreen(): HTMLElement {
   return h(
     'div',
     { class: 'tz-loading', role: 'status' },
-    h('div', { class: 'tz-card' }, h('div', { class: 'tz-loading-word', lang: 'de' }, ru.loading), h('div', { class: 'tz-loading-coin' })),
+    h(
+      'div',
+      { class: 'tz-card' },
+      h('div', { class: 'tz-loading-word', lang: 'de' }, ru.loading),
+      h('div', { class: 'tz-loading-coin' }),
+    ),
   );
 }
 
 export function introCaption(sec: number): HTMLElement {
-  return h('div', { class: 'tz-caption tz-intro', role: 'status' }, ru.introDoor(sec), h('small', {}, ru.tapToSkip));
+  return h(
+    'div',
+    { class: 'tz-caption tz-intro', role: 'status' },
+    ru.introDoor(sec),
+    h('small', {}, ru.tapToSkip),
+  );
 }
 
 export function bubble(text: string, onOk: () => void): HTMLElement {
@@ -358,6 +459,10 @@ export function bubble(text: string, onOk: () => void): HTMLElement {
     'div',
     { class: 'tz-bubble', role: 'dialog', 'aria-live': 'polite' },
     h('div', {}, text),
-    h('button', { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: onOk }, ru.tutorialOk),
+    h(
+      'button',
+      { class: 'tz-btn is-primary', type: 'button', 'data-autofocus': true, onclick: onOk },
+      ru.tutorialOk,
+    ),
   );
 }

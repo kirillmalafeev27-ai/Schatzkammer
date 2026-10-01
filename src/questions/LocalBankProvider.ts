@@ -45,7 +45,10 @@ export class LocalBankProvider implements QuestionProvider {
     this.reports.push(r);
     if (!r.correct && !this.comebacks.some((c) => c.id === r.id)) {
       const q = balance.questions;
-      this.comebacks.push({ id: r.id, due: this.shown + randInt(this.rng, q.wrongReturnMin, q.wrongReturnMax) });
+      this.comebacks.push({
+        id: r.id,
+        due: this.shown + randInt(this.rng, q.wrongReturnMin, q.wrongReturnMax),
+      });
     }
   }
 

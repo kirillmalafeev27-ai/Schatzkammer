@@ -52,7 +52,9 @@ export function parseHistory(raw: string | null): PaceHistory {
   if (!raw) return emptyHistory();
   try {
     const v = JSON.parse(raw) as Partial<PaceHistory>;
-    const times = Array.isArray(v.times) ? v.times.filter((x) => typeof x === 'number' && Number.isFinite(x)) : [];
+    const times = Array.isArray(v.times)
+      ? v.times.filter((x) => typeof x === 'number' && Number.isFinite(x))
+      : [];
     const correct = Array.isArray(v.correct) ? v.correct.map(Boolean) : [];
     return { times, correct };
   } catch {

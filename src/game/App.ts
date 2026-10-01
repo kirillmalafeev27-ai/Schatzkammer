@@ -14,7 +14,16 @@ import { generateLevel } from '../core/levelGen';
 import { computePace, pushAnswer } from '../core/pace';
 import { freshSeed } from '../core/rng';
 import { bagScore, isGem, itemValue, starsFor } from '../core/rules';
-import { awaitingTarget, canAnswer, coinsInBag, createState, currentCost, gemsInBag, isActive, score } from '../core/state';
+import {
+  awaitingTarget,
+  canAnswer,
+  coinsInBag,
+  createState,
+  currentCost,
+  gemsInBag,
+  isActive,
+  score,
+} from '../core/state';
 import { ru } from '../i18n/ru';
 import type { QuestionProvider } from '../questions/types';
 import { chooseGrid, computeLayout } from '../render/layout';
@@ -87,6 +96,8 @@ export class App implements SceneBridge {
   private bubbleEl: HTMLElement | null = null;
   private bubbleFlag: TutorialFlag | null = null;
   private finaleTimer: number | null = null;
+  /** Пропуск финала (тап, Пробел, Enter) — тот же путь, что и по таймеру. */
+  private finaleDone: (() => void) | null = null;
   private snapshotImg: HTMLImageElement | null = null;
   private settingsReturn: (() => void) | null = null;
   private coinChain = { n: 0, at: -1e9 };
@@ -113,18 +124,35 @@ export class App implements SceneBridge {
     this.levelTag = h('div', { class: 'tz-caption tz-tag', style: 'right:44px' }, ru.levelLabel(1));
     this.pauseBtn = h(
       'button',
-      { class: 'tz-pause', type: 'button', 'aria-label': ru.pauseButton, title: ru.pauseButton, onclick: () => this.pause() },
+      {
+        class: 'tz-pause',
+        type: 'button',
+        'aria-label': ru.pauseButton,
+        title: ru.pauseButton,
+        onclick: () => this.pause(),
+      },
       'II',
     );
     this.bag = new BagWidget();
     this.worldUi = h('div', { class: 'tz-world-ui' }, this.bag.el, this.levelTag, this.pauseBtn);
-    this.worldPanel = h('section', { class: 'tz-panel tz-world', 'aria-label': 'Сокровищница' }, this.canvasHost, this.worldUi);
+    this.worldPanel = h(
+      'section',
+      { class: 'tz-panel tz-world', 'aria-label': 'Сокровищница' },
+      this.canvasHost,
+      this.worldUi,
+    );
     this.panel = new QuestionPanel(this.touch);
     this.page = h('div', { class: 'tz-page' }, this.worldPanel, this.panel.el);
     const screensHost = h('div', { class: 'tz-screens' });
     this.screens = new Screens(screensHost);
     this.loading = loadingScreen();
-    this.root = h('div', { class: 'tz', 'data-touch': String(this.touch), tabindex: '-1' }, this.page, screensHost, this.loading);
+    this.root = h(
+      'div',
+      { class: 'tz', 'data-touch': String(this.touch), tabindex: '-1' },
+      this.page,
+      screensHost,
+      this.loading,
+    );
     container.append(this.root);
     this.applyReduced();
 
@@ -156,7 +184,8 @@ export class App implements SceneBridge {
   private async boot(): Promise<void> {
     await this.loadFonts();
     if (this.destroyed) return;
-    const cellPx = this.save.settings.quality === 'low' ? balance.quality.cellPxLow : balance.quality.cellPxHigh;
+    const cellPx =
+      this.save.settings.quality === 'low' ? balance.quality.cellPxLow : balance.quality.cellPxHigh;
     const rect = this.canvasHost.getBoundingClientRect();
     this.dpr = Math.min(window.devicePixelRatio || 1, balance.quality.maxDpr);
     this.game = new Phaser.Game({
@@ -168,7 +197,12 @@ export class App implements SceneBridge {
       banner: false,
       audio: { noAudio: true },
       scale: { mode: Phaser.Scale.NONE, zoom: 1 / this.dpr },
-      render: { antialias: true, mipmapFilter: 'LINEAR_MIPMAP_LINEAR', roundPixels: false, powerPreference: 'high-performance' },
+      render: {
+        antialias: true,
+        mipmapFilter: 'LINEAR_MIPMAP_LINEAR',
+        roundPixels: false,
+        powerPreference: 'high-performance',
+      },
       input: { activePointers: 2 },
       fps: { smoothStep: false },
     });
@@ -183,9 +217,19 @@ export class App implements SceneBridge {
 
   private async loadFonts(): Promise<void> {
     if (!document.fonts?.load) return;
-    const faces = ['400 32px Rubik', '500 32px Rubik', '700 32px Rubik', '800 32px Rubik', '900 32px Rubik', '400 32px Bangers'];
+    const faces = [
+      '400 32px Rubik',
+      '500 32px Rubik',
+      '700 32px Rubik',
+      '800 32px Rubik',
+      '900 32px Rubik',
+      '400 32px Bangers',
+    ];
     const sample = 'Сокровищница ÄÖÜß äöü Lädt';
-    await Promise.race([Promise.all(faces.map((f) => document.fonts.load(f, sample).catch(() => []))), new Promise((r) => setTimeout(r, 2500))]);
+    await Promise.race([
+      Promise.all(faces.map((f) => document.fonts.load(f, sample).catch(() => []))),
+      new Promise((r) => setTimeout(r, 2500)),
+    ]);
   }
 
   // ── SceneBridge ────────────────────────────────────────────────────────────
@@ -213,11 +257,18 @@ export class App implements SceneBridge {
     // Последние 10 с: тиканье и сердцебиение, эмбиент тише.
     const rem = r.state.D - r.state.t;
     const sec = Math.ceil(rem / 1000);
-    if (r.state.status === 'playing' && !this.paused() && rem < balance.colorScript.heartbeatLastMs && sec !== this.lastSecond) {
+    if (
+      r.state.status === 'playing' &&
+      !this.paused() &&
+      rem < balance.colorScript.heartbeatLastMs &&
+      sec !== this.lastSecond
+    ) {
       this.lastSecond = sec;
       this.audio.play('heartbeat', { vol: 0.9 });
     }
-    this.audio.setScrape(r.state.status === 'playing' && !this.paused() ? 0.35 + 0.65 * (r.state.t / r.state.D) : 0);
+    this.audio.setScrape(
+      r.state.status === 'playing' && !this.paused() ? 0.35 + 0.65 * (r.state.t / r.state.D) : 0,
+    );
     if (this.debugEl) this.renderDebug();
   }
 
@@ -280,6 +331,7 @@ export class App implements SceneBridge {
     const lay = computeLayout(w, hgt);
     this.root.dataset.orient = lay.orient;
     this.root.dataset.compact = String(lay.worldW < 520);
+    this.root.dataset.xl = String(w >= 1500 && hgt >= 860);
     this.root.style.setProperty('--q-size', `${lay.qSize}px`);
     this.root.style.setProperty('--gutter', `${lay.gutter}px`);
     if (this.phase !== 'playing' && this.phase !== 'intro' && this.phase !== 'finale') {
@@ -291,12 +343,13 @@ export class App implements SceneBridge {
     const rect = this.canvasHost.getBoundingClientRect();
     this.scene?.resizeView(rect.width, rect.height, this.dpr);
     this.updateTopReserve();
-    this.panel.fitPrompt();
+    this.panel.fit();
     this.positionBubble();
   }
 
   /** Плашка мешка заходит на рамку сверху — зал вписывается ниже неё. */
   private updateTopReserve(): void {
+    this.bag.fit();
     const visible = this.bag.el.style.visibility !== 'hidden';
     const reserve = visible ? Math.max(0, this.bag.el.offsetHeight - 15 + 6) : 0;
     this.scene?.setTopReserve(reserve);
@@ -419,7 +472,9 @@ export class App implements SceneBridge {
     round.on((ev) => this.onRoundEvents(ev));
     this.levelTag.textContent = ru.levelLabel(levelId);
     this.bag.reset();
-    this.bag.setSide(this.scene?.geom && this.scene.geom.door.cx < this.scene.geom.floorW * 0.42 ? 'right' : 'left');
+    this.bag.setSide(
+      this.scene?.geom && this.scene.geom.door.cx < this.scene.geom.floorW * 0.42 ? 'right' : 'left',
+    );
     this.setWorldUiVisible(true);
     this.panel.startRound(this.opts.questions);
     this.panel.setHoppla(this.save.settings.sfxLang === 'de' ? 'HOPPLA!' : 'ОПА!');
@@ -459,6 +514,7 @@ export class App implements SceneBridge {
     if (this.finaleTimer != null) clearTimeout(this.finaleTimer);
     this.introTimer = null;
     this.finaleTimer = null;
+    this.finaleDone = null;
     this.intro?.remove();
     this.intro = null;
     this.closeBubble(true);
@@ -477,7 +533,13 @@ export class App implements SceneBridge {
     const s = r.state;
     const playing = this.phase === 'playing' && s.status === 'playing';
     this.panel.setStep(s.pips, currentCost(s), playing && awaitingTarget(s));
-    this.bag.update(score(s), coinsInBag(s), gemsInBag(s), s.target === exitIndex(s.g), playing && isActive(s));
+    this.bag.update(
+      score(s),
+      coinsInBag(s),
+      gemsInBag(s),
+      s.target === exitIndex(s.g),
+      playing && isActive(s),
+    );
   }
 
   private onAnswer(correct: boolean, timeMs: number): void {
@@ -512,7 +574,10 @@ export class App implements SceneBridge {
           this.audio.play('pip', { pitch: 1 + e.pips * 0.08 });
           break;
         case 'STEP':
-          this.audio.play('step', { k: e.cost, pan: this.panOf(e.to === exitIndex(r.state.g) ? e.from : e.to) });
+          this.audio.play('step', {
+            k: e.cost,
+            pan: this.panOf(e.to === exitIndex(r.state.g) ? e.from : e.to),
+          });
           break;
         case 'PICKUP': {
           const now = performance.now();
@@ -524,7 +589,10 @@ export class App implements SceneBridge {
           }
           window.setTimeout(() => this.bag.gulp(), balance.anim.pickupFlyMs);
           if (e.bagCount === balance.bag.itemsPerCostStep && !this.save.tutorial.heavy) {
-            window.setTimeout(() => this.showTutorial('heavy', ru.tutorialHeavy), balance.anim.pickupFlyMs + 80);
+            window.setTimeout(
+              () => this.showTutorial('heavy', ru.tutorialHeavy),
+              balance.anim.pickupFlyMs + 80,
+            );
           }
           break;
         }
@@ -538,7 +606,8 @@ export class App implements SceneBridge {
           this.audio.play('drop');
           break;
         case 'SAND_WARN':
-          if (r.state.items[e.cell] || Math.random() < 0.25) this.audio.play('sandWarn', { pan: this.panOf(e.cell), vol: 0.7 });
+          if (r.state.items[e.cell] || Math.random() < 0.25)
+            this.audio.play('sandWarn', { pan: this.panOf(e.cell), vol: 0.7 });
           break;
         case 'SAND_BURIED':
           if (e.item) this.audio.play('sandBury', { pan: this.panOf(e.cell) });
@@ -585,12 +654,28 @@ export class App implements SceneBridge {
     this.positionBubble();
   }
 
+  /**
+   * Облачко над головой героя, а если сверху не хватает места (герой у двери, телефон) — под ним.
+   * По горизонтали облачко не выходит за панель, хвостик всё равно указывает на героя.
+   */
   private positionBubble(): void {
-    if (!this.bubbleEl || !this.scene?.hero) return;
-    const p = this.scene.worldToCss(this.scene.hero.x, this.scene.hero.y - CELL * 1.5);
-    const w = this.canvasHost.clientWidth;
-    this.bubbleEl.style.left = `${Math.max(150, Math.min(w - 150, p.x))}px`;
-    this.bubbleEl.style.top = `${Math.max(150, p.y)}px`;
+    const el = this.bubbleEl;
+    const hero = this.scene?.hero;
+    if (!el || !hero || !this.scene) return;
+    const head = this.scene.worldToCss(hero.x, hero.y - CELL * 1.5);
+    const feet = this.scene.worldToCss(hero.x, hero.y + CELL * 0.2);
+    const W = this.canvasHost.clientWidth;
+    const H = this.canvasHost.clientHeight;
+    const bw = el.offsetWidth;
+    const bh = el.offsetHeight;
+    const m = 8;
+    const tail = 22;
+    const below = head.y - bh - tail < m;
+    const x = Math.max(bw / 2 + m, Math.min(W - bw / 2 - m, head.x));
+    el.classList.toggle('is-below', below);
+    el.style.left = `${x}px`;
+    el.style.top = `${below ? Math.min(H - bh - m, feet.y + tail) : head.y}px`;
+    el.style.setProperty('--tail-x', `${Math.max(24, Math.min(bw - 24, head.x - (x - bw / 2)))}px`);
   }
 
   private closeBubble(silent = false): void {
@@ -605,7 +690,8 @@ export class App implements SceneBridge {
 
   private maybeRiskTutorial(): void {
     const r = this.round;
-    if (!r || this.save.tutorial.risk || r.level.config.trail !== 'risk' || !this.save.settings.trailHints) return;
+    if (!r || this.save.tutorial.risk || r.level.config.trail !== 'risk' || !this.save.settings.trailHints)
+      return;
     if (r.state.status !== 'playing' || this.paused()) return;
     if (r.risk().level !== 'safe') this.showTutorial('risk', ru.tutorialRisk);
   }
@@ -639,7 +725,8 @@ export class App implements SceneBridge {
   }
 
   private autoPause(): void {
-    if (this.phase === 'playing' && this.round && !this.round.state.pauseReasons.includes('user')) this.pause();
+    if (this.phase === 'playing' && this.round && !this.round.state.pauseReasons.includes('user'))
+      this.pause();
   }
 
   // ── Финал и итоги ──────────────────────────────────────────────────────────
@@ -653,15 +740,36 @@ export class App implements SceneBridge {
     this.audio.setScrape(0);
     this.audio.duck(false);
     this.audio.play(escaped ? 'fanfare' : 'slam');
+    // Кадр для итогов: герой в прыжке к открытой двери (до белой вспышки нырка — на медленном
+    // устройстве её твин тянется дольше) или после удара двери и «ZU SPÄT!».
+    const shotAt = escaped ? 0 : 760;
+    let shot: Promise<void> | null = null;
+    const takeShot = (maxWaitMs?: number): Promise<void> => {
+      shot ??= (this.scene?.snapshotClean(maxWaitMs) ?? Promise.resolve(null)).then((img) => {
+        if (this.round === r) this.snapshotImg = img;
+      });
+      return shot;
+    };
     window.setTimeout(() => {
-      void this.scene?.snapshot().then((img) => (this.snapshotImg = img));
-    }, 320);
+      if (this.round === r && this.phase === 'finale') void takeShot();
+    }, shotAt);
     const done = () => {
       this.canvasHost.removeEventListener('pointerdown', done);
       if (this.finaleTimer != null) clearTimeout(this.finaleTimer);
       this.finaleTimer = null;
-      if (this.phase === 'finale') window.setTimeout(() => this.showResults(escaped), this.snapshotImg ? 0 : 350);
+      this.finaleDone = null;
+      if (this.phase !== 'finale' || this.round !== r) return;
+      // Пропуск тапом: кадр снимается сразу, итоги не ждут его дольше 600 мс.
+      const show = () => {
+        if (this.phase === 'finale' && this.round === r) this.showResults(escaped);
+      };
+      const fallback = window.setTimeout(show, 600);
+      void takeShot(250).then(() => {
+        window.clearTimeout(fallback);
+        show();
+      });
     };
+    this.finaleDone = done;
     this.finaleTimer = window.setTimeout(done, balance.anim.finaleMaxMs);
     window.setTimeout(() => this.canvasHost.addEventListener('pointerdown', done, { once: true }), 250);
   }
@@ -677,12 +785,25 @@ export class App implements SceneBridge {
     const times = [...s.stats.answerTimes].sort((a, b) => a - b);
     const med = times.length ? times[Math.floor(times.length / 2)] : 0;
     const margin = escaped && s.escapedAt != null ? (s.D - s.escapedAt) / 1000 : null;
-    const bagIcons = s.bag.map((c) => ({ src: isGem(c) ? this.iconCache[GEM_KIND_BY_CODE[c]] : this.iconCache.coin, value: itemValue(c) }));
+    const bagIcons = s.bag.map((c) => ({
+      src: isGem(c) ? this.iconCache[GEM_KIND_BY_CODE[c]] : this.iconCache.coin,
+      value: itemValue(c),
+    }));
     const nextId = this.levelId < ENDLESS_LEVEL_ID ? this.levelId + 1 : ENDLESS_LEVEL_ID;
     const hasNext = this.save.isUnlocked(nextId) && levels.some((l) => l.id === nextId);
     this.opts.onFinish?.({ level: this.levelId, escaped, score: sc, stars });
     const lang = this.save.settings.sfxLang;
-    const stamp = escaped ? (margin != null && margin * 1000 < balance.door.narrowEscapeMs ? (lang === 'de' ? 'KNAPP!' : 'ЕЛЕ УСПЕЛ!') : lang === 'de' ? 'GESCHAFFT!' : 'ПОЛУЧИЛОСЬ!') : lang === 'de' ? 'ZU SPÄT!' : 'ПОЗДНО!';
+    const stamp = escaped
+      ? margin != null && margin * 1000 < balance.door.narrowEscapeMs
+        ? lang === 'de'
+          ? 'KNAPP!'
+          : 'ЕЛЕ УСПЕЛ!'
+        : lang === 'de'
+          ? 'GESCHAFFT!'
+          : 'ПОЛУЧИЛОСЬ!'
+      : lang === 'de'
+        ? 'ZU SPÄT!'
+        : 'ПОЗДНО!';
     this.screens.show(
       resultsScreen(
         {
@@ -729,11 +850,7 @@ export class App implements SceneBridge {
       return;
     }
     if (this.phase === 'finale' && (e.key === ' ' || e.key === 'Enter')) {
-      if (this.finaleTimer != null) {
-        clearTimeout(this.finaleTimer);
-        this.finaleTimer = null;
-        this.showResults(this.round?.state.status === 'escaped');
-      }
+      this.finaleDone?.();
       return;
     }
     if (this.phase !== 'playing' || !this.round) return;
@@ -756,7 +873,12 @@ export class App implements SceneBridge {
     }
     const g = r.state.g;
     const { x, y } = cellXY(g, r.state.hero);
-    const arrows: Record<string, [number, number]> = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
+    const arrows: Record<string, [number, number]> = {
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+    };
     if (arrows[e.key]) {
       e.preventDefault();
       if (this.bubbleFlag === 'start') this.closeBubble();
@@ -843,8 +965,16 @@ export class App implements SceneBridge {
     }
     el.replaceChildren(
       ...lines.map((l) => h('div', {}, l)),
-      h('button', { type: 'button', onclick: () => r?.dispatch({ type: 'DEBUG_SET_TIME', t: r.state.D - 10_000 }) }, '→ 10 с'),
-      h('button', { type: 'button', onclick: () => r && (r.immortal = !r.immortal) }, r?.immortal ? 'смертен' : 'бессмертие'),
+      h(
+        'button',
+        { type: 'button', onclick: () => r?.dispatch({ type: 'DEBUG_SET_TIME', t: r.state.D - 10_000 }) },
+        '→ 10 с',
+      ),
+      h(
+        'button',
+        { type: 'button', onclick: () => r && (r.immortal = !r.immortal) },
+        r?.immortal ? 'смертен' : 'бессмертие',
+      ),
     );
   }
 
@@ -871,6 +1001,7 @@ export class App implements SceneBridge {
     this.ro?.disconnect();
     for (const [t, type, fn] of this.listeners) t.removeEventListener(type, fn);
     this.audio.destroy();
+    this.scene?.dispose();
     this.game?.destroy(true);
     this.game = null;
     this.root.remove();

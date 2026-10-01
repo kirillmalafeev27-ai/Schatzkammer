@@ -33,12 +33,20 @@ export class WorldView {
   private readonly obstacles: ObstacleSprite[] = [];
   private readonly torches: Torch[] = [];
   private readonly crystalGlows: { img: Phaser.GameObjects.Image; phase: number }[] = [];
-  private readonly crystalGlints: { img: Phaser.GameObjects.Image; phase: number; x: number; y: number }[] = [];
+  private readonly crystalGlints: { img: Phaser.GameObjects.Image; phase: number; x: number; y: number }[] =
+    [];
   private time = 0;
   private reduced = false;
   private readonly rng: () => number;
   /** Пылинки, висящие в воздухе зала: в пятнах света они вспыхивают, в тени — тонут. */
-  private readonly dust: { img: Phaser.GameObjects.Image; x: number; y: number; vx: number; vy: number; ph: number }[] = [];
+  private readonly dust: {
+    img: Phaser.GameObjects.Image;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    ph: number;
+  }[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -76,7 +84,10 @@ export class WorldView {
     for (const t of geom.torches) {
       const holder = art.img(t.x, t.y, SPR.torchHolder).setDepth(DEPTH.wallProps);
       const frame = Math.floor(this.rng() * SPR.flames.length);
-      const flame = art.img(t.x, t.y - 16, SPR.flames[frame]).setDepth(DEPTH.wallProps + 1).setBlendMode(blend.emissive);
+      const flame = art
+        .img(t.x, t.y - 16, SPR.flames[frame])
+        .setDepth(DEPTH.wallProps + 1)
+        .setBlendMode(blend.emissive);
       layers.objects.add([holder, flame]);
       this.torches.push({ holder, flame, frame, next: this.rng() * 90, embers: [], x: t.x, y: t.y - 30 });
     }
@@ -103,7 +114,12 @@ export class WorldView {
       this.crystalGlows.push({ img: glow, phase: this.rng() * 6 });
       const gl = art.img(c.x, c.y, SPR.glint).setAlpha(0).setBlendMode(blend.emissive);
       layers.atmos.add(gl);
-      this.crystalGlints.push({ img: gl, phase: this.rng(), x: c.x + (this.rng() - 0.5) * 20 * c.s, y: c.y - 14 * c.s });
+      this.crystalGlints.push({
+        img: gl,
+        phase: this.rng(),
+        x: c.x + (this.rng() - 0.5) * 20 * c.s,
+        y: c.y - 14 * c.s,
+      });
     }
   }
 
@@ -181,11 +197,13 @@ export class WorldView {
       d.img.setAlpha(0.22 + 0.2 * Math.sin(this.time / 900 + d.ph));
     }
     for (const c of this.crystalGlows) {
-      const p = this.reduced ? 0.5 : 0.5 + 0.5 * Math.sin((this.time / balance.light.crystal.pulseMs) * Math.PI * 2 + c.phase);
+      const p = this.reduced
+        ? 0.5
+        : 0.5 + 0.5 * Math.sin((this.time / balance.light.crystal.pulseMs) * Math.PI * 2 + c.phase);
       c.img.setAlpha(c.img.visible ? 0.25 + 0.25 * p : 0);
     }
     for (const c of this.crystalGlints) {
-      const k = ((this.time / 3100 + c.phase) % 1 + 1) % 1;
+      const k = (((this.time / 3100 + c.phase) % 1) + 1) % 1;
       const a = k < 0.1 && !this.reduced ? Math.sin((k / 0.1) * Math.PI) : 0;
       c.img.setPosition(c.x, c.y).setAlpha(a);
       c.img.setScale(this.art.baseScale(SPR.glint) * (0.5 + a * 0.5));

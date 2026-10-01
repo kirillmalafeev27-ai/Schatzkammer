@@ -23,6 +23,8 @@ export class BagWidget {
   private readonly exitBtn: HTMLButtonElement;
   private readonly dropCoinIcon: HTMLImageElement;
   private readonly dropGemIcon: HTMLImageElement;
+  private readonly main: HTMLElement;
+  private readonly actions: HTMLElement;
   private last = { score: -1, coins: -1, gems: -1, exit: false };
   onDrop: (kind: 'coin' | 'gem') => void = () => {};
   onExit: () => void = () => {};
@@ -41,33 +43,69 @@ export class BagWidget {
       h('span', { class: 'tz-bag-count', title: ru.gems }, this.gemImg, '×', this.gemN),
     );
     const main = h('div', { class: 'tz-bag-main' }, this.icon, this.score, counts);
+    this.main = main;
     const coinIco = h('img', { alt: '' });
     const gemIco = h('img', { alt: '' });
     this.dropCoinIcon = coinIco;
     this.dropGemIcon = gemIco;
     this.dropCoinBtn = h(
       'button',
-      { class: 'tz-mini', type: 'button', 'aria-label': ru.dropCoin, title: ru.dropCoin, onclick: () => this.onDrop('coin') },
+      {
+        class: 'tz-mini',
+        type: 'button',
+        'aria-label': ru.dropCoin,
+        title: ru.dropCoin,
+        onclick: () => this.onDrop('coin'),
+      },
       h('span', { class: 'tz-minus' }, '−'),
       coinIco,
       h('span', { class: 'tz-kbd' }, 'Q'),
     );
     this.dropGemBtn = h(
       'button',
-      { class: 'tz-mini', type: 'button', 'aria-label': ru.dropGem, title: ru.dropGem, onclick: () => this.onDrop('gem') },
+      {
+        class: 'tz-mini',
+        type: 'button',
+        'aria-label': ru.dropGem,
+        title: ru.dropGem,
+        onclick: () => this.onDrop('gem'),
+      },
       h('span', { class: 'tz-minus' }, '−'),
       gemIco,
       h('span', { class: 'tz-kbd' }, 'E'),
     );
     this.exitBtn = h(
       'button',
-      { class: 'tz-mini tz-exit', type: 'button', 'aria-label': ru.toExitHint, title: ru.toExitHint, 'aria-pressed': 'false', onclick: () => this.onExit() },
+      {
+        class: 'tz-mini tz-exit',
+        type: 'button',
+        'aria-label': ru.toExitHint,
+        title: ru.toExitHint,
+        'aria-pressed': 'false',
+        onclick: () => this.onExit(),
+      },
       '↑ ',
       ru.toExit,
       h('span', { class: 'tz-kbd' }, 'H'),
     );
     const actions = h('div', { class: 'tz-bag-actions' }, this.dropCoinBtn, this.dropGemBtn, this.exitBtn);
-    this.el = h('div', { class: 'tz-caption tz-bag', role: 'group', 'aria-label': ru.bagLabel }, main, actions);
+    this.actions = actions;
+    this.el = h(
+      'div',
+      { class: 'tz-caption tz-bag', role: 'group', 'aria-label': ru.bagLabel },
+      main,
+      actions,
+    );
+  }
+
+  /**
+   * Кнопки не влезают в строку с суммой — плашка в две строки и ужимается по ширине
+   * (иначе перенос оставлял справа пустую жёлтую полосу).
+   */
+  fit(): void {
+    this.el.dataset.rows = '1';
+    const wrapped = this.actions.offsetTop > this.main.offsetTop + 2;
+    this.el.dataset.rows = wrapped ? '2' : '1';
   }
 
   setIcons(icons: BagIcons): void {

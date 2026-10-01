@@ -114,7 +114,10 @@ export class SaveData {
   record(levelId: number, stars: number, score: number): { newBest: boolean } {
     const prev = this.progress[levelId] ?? { stars: 0, best: 0 };
     const newBest = stars > 0 && score > prev.best;
-    this.progress[levelId] = { stars: Math.max(prev.stars, stars), best: Math.max(prev.best, stars > 0 ? score : 0) };
+    this.progress[levelId] = {
+      stars: Math.max(prev.stars, stars),
+      best: Math.max(prev.best, stars > 0 ? score : 0),
+    };
     this.saveProgress();
     return { newBest };
   }

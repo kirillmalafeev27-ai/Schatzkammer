@@ -49,7 +49,9 @@ export function runBot(
   s = dispatch(s, { type: 'START' });
   const exit = exitIndex(s.g);
   const factor = balance.sim.strategies[strategy];
-  const plan = createPlanner({ g: s.g, blocked: level.blocked, items: s.items, start: s.hero }).best(level.budget * factor);
+  const plan = createPlanner({ g: s.g, blocked: level.blocked, items: s.items, start: s.hero }).best(
+    level.budget * factor,
+  );
   const queue = [...plan.cells];
   let goingHome = false;
   let answers = 0;
@@ -97,7 +99,13 @@ export interface Report {
   meanStars: number;
 }
 
-export function simulate(levelId: number, runs: number, tMed = 5000, p = 0.8, cfgOverride?: LevelConfig): Report[] {
+export function simulate(
+  levelId: number,
+  runs: number,
+  tMed = 5000,
+  p = 0.8,
+  cfgOverride?: LevelConfig,
+): Report[] {
   const cfg = cfgOverride ?? getLevel(levelId);
   const out: Report[] = [];
   const halls: GeneratedLevel[] = [];
@@ -116,7 +124,15 @@ export function simulate(levelId: number, runs: number, tMed = 5000, p = 0.8, cf
     }
     const escapeRate = esc / runs;
     const meanLoot = esc ? loot / esc : 0;
-    out.push({ level: levelId, strategy, runs, escapeRate, meanLoot, ev: escapeRate * meanLoot, meanStars: stars / runs });
+    out.push({
+      level: levelId,
+      strategy,
+      runs,
+      escapeRate,
+      meanLoot,
+      ev: escapeRate * meanLoot,
+      meanStars: stars / runs,
+    });
   }
   return out;
 }

@@ -9,7 +9,16 @@ import type { Ctx } from '../comicKit';
 
 const grey = (v: number) => `rgb(${v},${v},${v})`;
 
-function rect(ctx: Ctx, x: number, y: number, w: number, h: number, fill: string, stroke: string = palette.ink, lw = 3) {
+function rect(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  fill: string,
+  stroke: string = palette.ink,
+  lw = 3,
+) {
   ctx.fillStyle = fill;
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = stroke;
@@ -17,7 +26,15 @@ function rect(ctx: Ctx, x: number, y: number, w: number, h: number, fill: string
   ctx.strokeRect(x, y, w, h);
 }
 
-function circle(ctx: Ctx, x: number, y: number, r: number, fill: string, stroke: string | null = palette.ink as string, lw = 3) {
+function circle(
+  ctx: Ctx,
+  x: number,
+  y: number,
+  r: number,
+  fill: string,
+  stroke: string | null = palette.ink as string,
+  lw = 3,
+) {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fillStyle = fill;
@@ -79,30 +96,37 @@ export const greyKit: StyleKit = {
     box(h.armB, 18, 44, 9, 4, (c) => rect(c, 2, 2, 14, 40, palette.hero.shirt));
     box(h.armF, 18, 44, 9, 4, (c) => rect(c, 2, 2, 14, 40, palette.hero.shirt));
     box(h.head, 64, 60, 32, 56, (c) => circle(c, 32, 30, 27, palette.hero.skin));
-    for (const e of [h.eyes, h.eyesFront, h.eyesBack]) box(e, 40, 16, 20, 8, (c) => {
-      circle(c, 10, 8, 5, '#ffffff');
-      circle(c, 30, 8, 5, '#ffffff');
-    });
+    for (const e of [h.eyes, h.eyesFront, h.eyesBack])
+      box(e, 40, 16, 20, 8, (c) => {
+        circle(c, 10, 8, 5, '#ffffff');
+        circle(c, 30, 8, 5, '#ffffff');
+      });
     box(h.eyesClosed, 40, 16, 20, 8, (c) => rect(c, 4, 7, 32, 2, palette.ink, palette.ink, 1));
-    for (const b of [h.browsNeutral, h.browsWorried, h.browsStrain, h.browsHappy]) box(b, 40, 12, 20, 6, (c) => rect(c, 4, 4, 32, 3, palette.ink, palette.ink, 1));
-    for (const m of [h.mouthSmile, h.mouthOpen, h.mouthFlat, h.mouthGrit]) box(m, 20, 12, 10, 6, (c) => rect(c, 3, 4, 14, 3, palette.ink, palette.ink, 1));
+    for (const b of [h.browsNeutral, h.browsWorried, h.browsStrain, h.browsHappy])
+      box(b, 40, 12, 20, 6, (c) => rect(c, 4, 4, 32, 3, palette.ink, palette.ink, 1));
+    for (const m of [h.mouthSmile, h.mouthOpen, h.mouthFlat, h.mouthGrit])
+      box(m, 20, 12, 10, 6, (c) => rect(c, 3, 4, 14, 3, palette.ink, palette.ink, 1));
     box(h.hat, 80, 40, 40, 34, (c) => rect(c, 4, 18, 72, 14, palette.hero.hat));
     box(h.scarf, 50, 20, 25, 10, (c) => rect(c, 3, 3, 44, 14, palette.hero.scarf));
     box(h.scarfTail, 40, 18, 4, 6, (c) => rect(c, 2, 2, 36, 12, palette.hero.scarf));
     box(h.lantern, 24, 30, 12, 4, (c) => rect(c, 3, 4, 18, 24, palette.hero.lantern));
-    h.bag.forEach((n, i) => box(n, 60 + i * 6, 60 + i * 8, 30, 50, (c) => rect(c, 4, 4, 52 + i * 6, 52 + i * 8, palette.hero.bag)));
+    h.bag.forEach((n, i) =>
+      box(n, 60 + i * 6, 60 + i * 8, 30, 50, (c) => rect(c, 4, 4, 52 + i * 6, 52 + i * 8, palette.hero.bag)),
+    );
     box(h.sweat, 12, 16, 6, 8, (c) => circle(c, 6, 9, 5, palette.sweat));
 
     box(SPR.torchHolder, 40, 60, 20, 20, (c) => rect(c, 14, 10, 12, 44, grey(70)));
-    SPR.flames.forEach((n, i) => box(n, 40, 60, 20, 56, (c) => {
-      c.beginPath();
-      c.moveTo(20, 6 + i);
-      c.lineTo(34, 54);
-      c.lineTo(6, 54);
-      c.closePath();
-      c.fillStyle = '#e08030';
-      c.fill();
-    }));
+    SPR.flames.forEach((n, i) =>
+      box(n, 40, 60, 20, 56, (c) => {
+        c.beginPath();
+        c.moveTo(20, 6 + i);
+        c.lineTo(34, 54);
+        c.lineTo(6, 54);
+        c.closePath();
+        c.fillStyle = '#e08030';
+        c.fill();
+      }),
+    );
     box(SPR.ember, 8, 8, 4, 4, (c) => circle(c, 4, 4, 3, '#ffb040', null));
 
     const d = SPR.door;
@@ -124,36 +148,51 @@ export const greyKit: StyleKit = {
       c.closePath();
       c.fill();
     });
-    box(d.rays, 120, 100, 60, 100, (c) => rect(c, 0, 0, 120, 100, 'rgba(255,255,255,0.1)', 'rgba(0,0,0,0)', 1));
+    box(d.rays, 120, 100, 60, 100, (c) =>
+      rect(c, 0, 0, 120, 100, 'rgba(255,255,255,0.1)', 'rgba(0,0,0,0)', 1),
+    );
 
     box(SPR.hourglass.frame, 56, 92, 28, 46, (c) => rect(c, 4, 4, 48, 84, 'rgba(0,0,0,0)', grey(150), 4));
-    box(SPR.hourglass.sand, 36, 36, 18, 36, (c) => rect(c, 2, 2, 32, 32, palette.sand.base, palette.sand.base, 1));
-    box(SPR.hourglass.glass, 56, 92, 28, 46, (c) => rect(c, 8, 8, 40, 76, 'rgba(255,255,255,0.15)', 'rgba(0,0,0,0)', 1));
+    box(SPR.hourglass.sand, 36, 36, 18, 36, (c) =>
+      rect(c, 2, 2, 32, 32, palette.sand.base, palette.sand.base, 1),
+    );
+    box(SPR.hourglass.glass, 56, 92, 28, 46, (c) =>
+      rect(c, 8, 8, 40, 76, 'rgba(255,255,255,0.15)', 'rgba(0,0,0,0)', 1),
+    );
 
-    box(SPR.sandStream, 24, 190, 12, 190, (c) => rect(c, 8, 0, 8, 190, palette.sand.base, palette.sand.base, 1));
+    box(SPR.sandStream, 24, 190, 12, 190, (c) =>
+      rect(c, 8, 0, 8, 190, palette.sand.base, palette.sand.base, 1),
+    );
     box(SPR.sandGrain, 8, 8, 4, 4, (c) => circle(c, 4, 4, 3, palette.sand.light, null));
-    SPR.dunes.forEach((n, i) => box(n, 130, 80, 65, 60, (c) => {
-      c.fillStyle = palette.sand.base;
-      c.beginPath();
-      c.ellipse(65, 60, 40 + i * 12, 10 + i * 10, 0, 0, Math.PI * 2);
-      c.fill();
-    }));
+    SPR.dunes.forEach((n, i) =>
+      box(n, 130, 80, 65, 60, (c) => {
+        c.fillStyle = palette.sand.base;
+        c.beginPath();
+        c.ellipse(65, 60, 40 + i * 12, 10 + i * 10, 0, 0, Math.PI * 2);
+        c.fill();
+      }),
+    );
     box(SPR.puff, 60, 40, 30, 30, (c) => circle(c, 30, 22, 16, 'rgba(230,200,150,0.6)', null));
     box(SPR.crack, 60, 20, 30, 10, (c) => rect(c, 4, 8, 52, 4, palette.ink, palette.ink, 1));
 
-    const pr = (n: string, col: string) => box(n, 26, 36, 13, 18, (c) => {
-      c.beginPath();
-      c.ellipse(13, 18, 9, 15, 0, 0, Math.PI * 2);
-      c.fillStyle = col;
-      c.fill();
-    });
+    const pr = (n: string, col: string) =>
+      box(n, 26, 36, 13, 18, (c) => {
+        c.beginPath();
+        c.ellipse(13, 18, 9, 15, 0, 0, Math.PI * 2);
+        c.fillStyle = col;
+        c.fill();
+      });
     SPR.print.safe.forEach((n) => pr(n, palette.footprints.safe));
     SPR.print.warn.forEach((n) => pr(n, palette.footprints.warn));
     SPR.print.danger.forEach((n) => pr(n, palette.footprints.danger));
     SPR.print.plain.forEach((n) => pr(n, '#dddddd'));
     box(SPR.badge, 44, 44, 22, 22, (c) => circle(c, 22, 22, 18, palette.caption));
-    box(SPR.targetRing, CELL, CELL, CELL / 2, CELL / 2, (c) => rect(c, 6, 6, CELL - 12, CELL - 12, 'rgba(0,0,0,0)', '#ffffff', 4));
-    box(SPR.targetGlow, CELL, CELL, CELL / 2, CELL / 2, (c) => rect(c, 6, 6, CELL - 12, CELL - 12, 'rgba(255,255,255,0.2)', 'rgba(0,0,0,0)', 1));
+    box(SPR.targetRing, CELL, CELL, CELL / 2, CELL / 2, (c) =>
+      rect(c, 6, 6, CELL - 12, CELL - 12, 'rgba(0,0,0,0)', '#ffffff', 4),
+    );
+    box(SPR.targetGlow, CELL, CELL, CELL / 2, CELL / 2, (c) =>
+      rect(c, 6, 6, CELL - 12, CELL - 12, 'rgba(255,255,255,0.2)', 'rgba(0,0,0,0)', 1),
+    );
     box(SPR.pipFull, 22, 22, 11, 11, (c) => rect(c, 3, 3, 16, 16, palette.good));
     box(SPR.pipEmpty, 22, 22, 11, 11, (c) => rect(c, 3, 3, 16, 16, '#ffffff'));
     box(SPR.lightSpot, 128, 128, 64, 64, (c) => {

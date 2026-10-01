@@ -67,7 +67,11 @@ export class Juice {
     private readonly art: Art,
     private readonly layers: Layers,
   ) {
-    this.flashRect = scene.add.rectangle(0, 0, 10, 10, 0xffffff, 1).setOrigin(0, 0).setAlpha(0).setVisible(false);
+    this.flashRect = scene.add
+      .rectangle(0, 0, 10, 10, 0xffffff, 1)
+      .setOrigin(0, 0)
+      .setAlpha(0)
+      .setVisible(false);
     layers.overlay.add(this.flashRect);
   }
 
@@ -87,8 +91,20 @@ export class Juice {
   }
 
   countdown(n: number, x: number, y: number): void {
-    const digit: SfxStyle = { fill: n <= 3 ? palette.bad : palette.caption, outer: palette.ink, size: 150, burst: n <= 3 ? palette.paper : null, skew: -0.1 };
-    const wordStyle: SfxStyle = { fill: palette.white, outer: n <= 3 ? palette.bad : palette.hero.scarf, size: 40, burst: null, skew: -0.1 };
+    const digit: SfxStyle = {
+      fill: n <= 3 ? palette.bad : palette.caption,
+      outer: palette.ink,
+      size: 150,
+      burst: n <= 3 ? palette.paper : null,
+      skew: -0.1,
+    };
+    const wordStyle: SfxStyle = {
+      fill: palette.white,
+      outer: n <= 3 ? palette.bad : palette.hero.scarf,
+      size: 40,
+      burst: null,
+      skew: -0.1,
+    };
     const label = (this.lang === 'de' ? countdownDe : countdownRu)[n] ?? '';
     this.spawn(String(n), digit, x, y, 1, true);
     this.spawn(label, wordStyle, x, y + 104, 1, true);
@@ -142,7 +158,12 @@ export class Juice {
     if (w.dead) return;
     w.dead = true;
     if (fast || this.reduced) {
-      this.scene.tweens.add({ targets: w.img, alpha: 0, duration: fast ? 80 : 200, onComplete: () => w.img.destroy() });
+      this.scene.tweens.add({
+        targets: w.img,
+        alpha: 0,
+        duration: fast ? 80 : 200,
+        onComplete: () => w.img.destroy(),
+      });
     } else {
       this.scene.tweens.add({
         targets: w.img,
@@ -178,6 +199,11 @@ export class Juice {
     this.punchAt = this.time;
   }
 
+  /** Идёт ли вспышка (снимок для итогов ждёт, пока она погаснет). */
+  flashActive(): boolean {
+    return this.flashRect.visible && this.flashRect.alpha > 0.03;
+  }
+
   /** Вспышка не чаще трёх раз в секунду. */
   flash(color: string = palette.white, ms = 220, alpha = 0.85): void {
     if (this.reduced) return;
@@ -189,7 +215,13 @@ export class Juice {
     this.flashRect.setPosition(v.x - 50, v.y - 50).setSize(v.width + 100, v.height + 100);
     this.flashRect.setFillStyle(hexToInt(color), 1);
     this.flashRect.setVisible(true).setAlpha(alpha);
-    this.scene.tweens.add({ targets: this.flashRect, alpha: 0, duration: ms, ease: 'Quad.Out', onComplete: () => this.flashRect.setVisible(false) });
+    this.scene.tweens.add({
+      targets: this.flashRect,
+      alpha: 0,
+      duration: ms,
+      ease: 'Quad.Out',
+      onComplete: () => this.flashRect.setVisible(false),
+    });
   }
 
   /** Хит-стоп замораживает только картинку мира. */
