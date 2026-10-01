@@ -29,6 +29,7 @@ export function mountTreasury(container: HTMLElement, options: TreasuryOptions):
     onFinish: options.onFinish,
     kit: pickKit(params.get('art')),
     debug: params.has('debug'),
+    autoQuality: !params.has('test'),
   });
   return { destroy: () => app.destroy() };
 }

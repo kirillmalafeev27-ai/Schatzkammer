@@ -27,6 +27,8 @@ uniform float uDot;
 uniform float uTint;
 uniform vec4 uVignette;                  // сила, радиус, пульс, 0
 uniform vec3 uVignetteColor;
+uniform float uDebug;
+uniform float uGlow;
 
 // Ступень с растром: в полосе вокруг порога пиксель внутри точки получает верхнюю ступень.
 float stepWithDots(float lum, float lo, float hi, float thr, vec2 p) {
@@ -71,6 +73,14 @@ void main () {
 
   vec3 tint = mix(vec3(1.0), hue, uTint);
   vec3 col = scene.rgb * tint * q;
+  // На верхней ступени свет «красит» поверхность своим цветом — пятна светятся, а не сереют.
+  float lit = clamp((q - uSteps.y) / max(0.001, uSteps.z - uSteps.y), 0.0, 1.0);
+  col += hue * lit * uGlow;
+  // Самосветящиеся пиксели (альфа обнулена режимом EMISSIVE) свет не затемняет.
+  float emissive = clamp(1.0 - scene.a, 0.0, 1.0);
+  col = mix(col, scene.rgb * 1.04, emissive);
+  if (uDebug > 0.5 && uDebug < 1.5) { gl_FragColor = vec4(vec3(lum), 1.0); return; }
+  if (uDebug > 1.5) { gl_FragColor = vec4(vec3(q), 1.0); return; }
 
   // Виньетка цветового сценария: тоже ступенями с растром.
   if (uVignette.x > 0.0) {
@@ -83,7 +93,7 @@ void main () {
     float dots = 1.0 - smoothstep(sqrt(v) * 0.72 - 0.08, sqrt(v) * 0.72 + 0.08, dd);
     col = mix(col, uVignetteColor * (0.35 + 0.65 * uVignette.z), dots * clamp(v * 1.6, 0.0, 1.0));
   }
-  gl_FragColor = vec4(col, scene.a);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -107,6 +117,10 @@ export class ComicLightController extends Phaser.Filters.Controller {
   tint = balance.light.tintAmount;
   vignette: [number, number, number, number] = [0, 0.6, 0, 0];
   vignetteColor: [number, number, number] = [0.1, 0.05, 0.12];
+  debug = 0;
+  glow: number = balance.light.glow;
+  steps: number[] = [...balance.light.steps];
+  thresholds: number[] = [...balance.light.thresholds];
   /** Перевод мира в пиксели текстуры камеры. */
   project: (x: number, y: number) => { x: number; y: number; s: number } = (x, y) => ({ x, y, s: 1 });
 
@@ -153,13 +167,15 @@ export class FilterComicLight extends Phaser.Renderer.WebGL.RenderNodes.BaseFilt
     pm.setUniform('uAmbient', c.ambient);
     pm.setUniform('uPlayfield', [c.playfield[0] * sx, c.playfield[1] * sy, c.playfield[2] * sx, c.playfield[3] * sy]);
     pm.setUniform('uFloorMin', c.floorMin);
-    pm.setUniform('uSteps', balance.light.steps as unknown as number[]);
-    pm.setUniform('uThresholds', balance.light.thresholds as unknown as number[]);
+    pm.setUniform('uSteps', c.steps);
+    pm.setUniform('uThresholds', c.thresholds);
     pm.setUniform('uBand', balance.light.halftoneBand);
     pm.setUniform('uDot', c.dot * sx);
     pm.setUniform('uTint', c.tint);
     pm.setUniform('uVignette', c.vignette);
     pm.setUniform('uVignetteColor', c.vignetteColor);
+    pm.setUniform('uDebug', c.debug);
+    pm.setUniform('uGlow', c.glow);
   }
 }
 
@@ -167,7 +183,6 @@ export function registerComicLight(renderer: Phaser.Renderer.WebGL.WebGLRenderer
   try {
     const nodes = renderer.renderNodes;
     if (!nodes.hasNode('FilterComicLight')) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       nodes.addNodeConstructor('FilterComicLight', FilterComicLight as any);
     }
     return true;

@@ -104,6 +104,11 @@ async function run(): Promise<void> {
       await playSome(page, 4);
       await page.waitForTimeout(900);
       await page.screenshot({ path: `${out}/${tag}-4-late.png` });
+      // Отсчёт последних секунд.
+      const s2 = await tz<any>(page, 'state');
+      await tz(page, 'setTime', s2.D - 7600);
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: `${out}/${tag}-5-countdown.png` });
       await tz(page, 'exit');
       for (let i = 0; i < 60; i++) {
         const st = await tz<any>(page, 'state');
@@ -111,8 +116,10 @@ async function run(): Promise<void> {
         await tz(page, 'answer', true);
         await page.waitForTimeout(60);
       }
-      await page.waitForTimeout(2600);
-      await page.screenshot({ path: `${out}/${tag}-5-results.png` });
+      await page.waitForTimeout(450);
+      await page.screenshot({ path: `${out}/${tag}-6-escape.png` });
+      await page.waitForTimeout(4500);
+      await page.screenshot({ path: `${out}/${tag}-7-results.png` });
     }
     const errs = logs.filter((l) => l.includes('error') || l.includes('pageerror'));
     console.log(`${tag}: ${errs.length ? errs.join('\n') : 'без ошибок'}`);

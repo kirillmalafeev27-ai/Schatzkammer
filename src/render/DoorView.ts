@@ -5,6 +5,7 @@ import Phaser from 'phaser';
 import { hexToInt, mixHex, palette } from '../config/palette';
 import type { Art } from '../art/ArtFactory';
 import { SPR } from '../art/manifest';
+import { blend } from './blend';
 import { CELL, type WorldGeom } from './geometry';
 import type { Layers } from './layers';
 
@@ -61,9 +62,10 @@ export class DoorView {
     const o = d.opening;
     const D = SPR.door;
 
-    this.sky = art.img(d.cx, 0, D.sky).setDepth(DEPTH.sky);
-    this.skyLate = art.img(d.cx, 0, D.skyLate).setDepth(DEPTH.sky + 1).setAlpha(0);
-    this.rays = art.img(d.cx, 0, D.rays).setDepth(DEPTH.sky + 2).setBlendMode(Phaser.BlendModes.ADD);
+    // Небо в щели — дневной свет, сам светится.
+    this.sky = art.img(d.cx, 0, D.sky).setDepth(DEPTH.sky).setBlendMode(blend.emissive);
+    this.skyLate = art.img(d.cx, 0, D.skyLate).setDepth(DEPTH.sky + 1).setAlpha(0).setBlendMode(blend.emissive);
+    this.rays = art.img(d.cx, 0, D.rays).setDepth(DEPTH.sky + 2).setBlendMode(blend.addKeep);
     this.slab = art.img(d.cx, o.y, D.slab).setDepth(DEPTH.slab);
     this.slabTexH = this.slab.frame.height;
     this.slabH = this.slabTexH * this.slab.scaleY;
@@ -87,10 +89,10 @@ export class DoorView {
     this.layers.objects.add([this.sky, this.skyLate, this.rays, this.slab, frameL, frameR, lintel, ...this.chains, ...this.gears]);
 
     // Луч дневного света на полу: аддитивная трапеция, длина равна щели.
-    this.beam = art.img(d.cx, -4, D.beam).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.5);
+    this.beam = art.img(d.cx, -4, D.beam).setBlendMode(blend.addKeep).setAlpha(0.5);
     this.layers.atmos.add(this.beam);
     for (let i = 0; i < 26; i++) {
-      const img = art.img(0, 0, SPR.softDot).setBlendMode(Phaser.BlendModes.ADD);
+      const img = art.img(0, 0, SPR.softDot).setBlendMode(blend.addKeep);
       img.setScale(art.baseScale(SPR.softDot) * (0.25 + this.rng() * 0.35));
       this.layers.atmos.add(img);
       this.motes.push({ img, x: this.rng(), y: this.rng(), vx: (this.rng() - 0.5) * 0.02, vy: -0.01 - this.rng() * 0.02, phase: this.rng() * 6 });

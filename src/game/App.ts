@@ -52,6 +52,8 @@ export interface AppOptions {
   onFinish?: (r: FinishResult) => void;
   kit: StyleKit;
   debug?: boolean;
+  /** Автопереключение качества по FPS (в автотестах выключено: там программный WebGL). */
+  autoQuality?: boolean;
 }
 
 type Phase = 'loading' | 'menu' | 'intro' | 'playing' | 'finale' | 'results';
@@ -277,6 +279,7 @@ export class App implements SceneBridge {
     if (!w || !hgt) return;
     const lay = computeLayout(w, hgt);
     this.root.dataset.orient = lay.orient;
+    this.root.dataset.compact = String(lay.worldW < 520);
     this.root.style.setProperty('--q-size', `${lay.qSize}px`);
     this.root.style.setProperty('--gutter', `${lay.gutter}px`);
     if (this.phase !== 'playing' && this.phase !== 'intro' && this.phase !== 'finale') {
@@ -287,8 +290,16 @@ export class App implements SceneBridge {
     this.dpr = Math.min(window.devicePixelRatio || 1, balance.quality.maxDpr);
     const rect = this.canvasHost.getBoundingClientRect();
     this.scene?.resizeView(rect.width, rect.height, this.dpr);
+    this.updateTopReserve();
     this.panel.fitPrompt();
     this.positionBubble();
+  }
+
+  /** Плашка мешка заходит на рамку сверху — зал вписывается ниже неё. */
+  private updateTopReserve(): void {
+    const visible = this.bag.el.style.visibility !== 'hidden';
+    const reserve = visible ? Math.max(0, this.bag.el.offsetHeight - 15 + 6) : 0;
+    this.scene?.setTopReserve(reserve);
   }
 
   private applyReduced(): void {
@@ -314,6 +325,7 @@ export class App implements SceneBridge {
     this.bag.el.style.visibility = v ? 'visible' : 'hidden';
     this.levelTag.style.visibility = v ? 'visible' : 'hidden';
     this.pauseBtn.style.visibility = v ? 'visible' : 'hidden';
+    this.updateTopReserve();
   }
 
   // ── Меню ───────────────────────────────────────────────────────────────────
@@ -791,6 +803,7 @@ export class App implements SceneBridge {
       return;
     }
     f.slow = fps < balance.quality.lowFpsThreshold ? f.slow + 1 : 0;
+    if (this.opts.autoQuality === false) return;
     if (f.slow >= balance.quality.lowFpsSeconds && !f.switched && this.save.settings.quality === 'high') {
       f.switched = true;
       this.applySettings({ ...this.save.settings, quality: 'low', qualityAuto: true });

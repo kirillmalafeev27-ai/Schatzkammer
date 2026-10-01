@@ -58,10 +58,12 @@ export function computeLights(inp: LightInputs): LightFrame {
     const n2 = still ? 0 : noise1(t * 1.6 * speed + 10, i + 7);
     out.push({
       x: tp.x,
-      y: tp.y + CELL * 0.5,
+      // Центр пятна — на полу перед стеной: так факел освещает и стену, и первые ряды плит.
+      y: tp.y + CELL * 1.1,
       radius: L.torch.radius * CELL * (1 + L.torch.flickerRadius * n2),
-      color: torchRgb,
-      intensity: L.torch.intensity * (1 + L.torch.flickerIntensity * n),
+      // Во второй половине раунда факелы краснеют вместе с закатом в щели.
+      color: mixRgb(torchRgb, [1, 0.52, 0.26], inp.flickerBoost * 0.6),
+      intensity: L.torch.intensity * (1 + L.torch.flickerIntensity * n * (1 + inp.flickerBoost)),
     });
   });
 

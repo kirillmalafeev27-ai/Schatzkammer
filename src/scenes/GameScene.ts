@@ -14,6 +14,7 @@ import { hashSeed, mulberry32 } from '../core/rng';
 import { isGem } from '../core/rules';
 import { currentCost, awaitingTarget, remainingMs, type GameState } from '../core/state';
 import type { Round } from '../game/Round';
+import { blend, registerBlendModes } from '../render/blend';
 import { ComicLightController, registerComicLight } from '../render/ComicLightFilter';
 import { DEPTH, DoorView } from '../render/DoorView';
 import { cellBase, CELL, worldGeom, type WorldGeom } from '../render/geometry';
@@ -79,6 +80,9 @@ export class GameScene extends Phaser.Scene {
   private cssH = 1;
   private dpr = 1;
   private baseZoom = 1;
+  /** Сколько CSS px сверху занимает плашка мешка — зал вписывается ниже. */
+  private topReserve = 0;
+  private camOffsetY = 0;
   private lastFrame = 0;
   private elapsed = 0;
   private lockedAnim = false;
@@ -99,6 +103,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    registerBlendModes(this.renderer);
     this.art = new Art(this, this.factory);
     this.layers = createLayers(this);
     const main = this.cameras.main;
@@ -209,7 +214,7 @@ export class GameScene extends Phaser.Scene {
     this.vignette.setDepth(1e9);
     this.layers.atmos.add(this.vignette);
     for (let i = 0; i < balance.light.maxLights; i++) {
-      const spot = this.art.img(0, 0, SPR.lightSpot).setBlendMode(Phaser.BlendModes.ADD).setVisible(false).setDepth(1e8);
+      const spot = this.art.img(0, 0, SPR.lightSpot).setBlendMode(blend.addKeep).setVisible(false).setDepth(1e8);
       this.layers.atmos.add(spot);
       this.fallback.push(spot);
     }
@@ -218,7 +223,12 @@ export class GameScene extends Phaser.Scene {
     this.juice.lang = this.bridge.sfxLang();
     this.juice.avoid = () => {
       if (!this.hero) return null;
-      return { x: this.hero.x - CELL * 0.45, y: this.hero.y - CELL * 1.45, w: CELL * 0.9, h: CELL * 1.5 };
+      // Прямоугольник, охватывающий героя сейчас и там, куда он прыгает.
+      const x0 = Math.min(this.hero.x, this.hero.destX) - CELL * 0.45;
+      const x1 = Math.max(this.hero.x, this.hero.destX) + CELL * 0.45;
+      const y0 = Math.min(this.hero.y, this.hero.destY) - CELL * 1.5;
+      const y1 = Math.max(this.hero.y, this.hero.destY) + CELL * 0.05;
+      return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
     };
     this.updateFallbackVisibility();
     this.fit();
@@ -269,12 +279,21 @@ export class GameScene extends Phaser.Scene {
     this.fit();
   }
 
+  setTopReserve(cssPx: number): void {
+    this.topReserve = Math.max(0, cssPx);
+    this.fit();
+  }
+
   private fit(): void {
     if (!this.geom) return;
     const b = this.geom.bounds;
     const w = this.scale.width;
     const h = this.scale.height;
-    this.baseZoom = Math.min(w / b.w, h / b.h);
+    const top = Math.min(h * 0.18, this.topReserve * this.dpr);
+    this.baseZoom = Math.min(w / b.w, (h - top) / b.h);
+    const worldH = b.h * this.baseZoom;
+    const free = Math.max(0, h - top - worldH);
+    this.camOffsetY = (top + free / 2 + worldH / 2 - h / 2) / this.baseZoom;
     this.applyCamera(0, 0, 1);
   }
 
@@ -283,13 +302,19 @@ export class GameScene extends Phaser.Scene {
     return (CELL * this.baseZoom) / this.dpr;
   }
 
+  /** Отладочный крупный план (скриншоты арта): множитель зума и точка мира. */
+  closeUp: { zoom: number; x: number; y: number } | null = null;
+
   private applyCamera(dx: number, dy: number, zoomMul: number): void {
     if (!this.geom) return;
     const b = this.geom.bounds;
-    const z = this.baseZoom * zoomMul * this.introZoom;
+    const cu = this.closeUp;
+    const z = this.baseZoom * zoomMul * this.introZoom * (cu?.zoom ?? 1);
+    const cx = cu ? cu.x : b.x + b.w / 2;
+    const cy = cu ? cu.y : b.y + b.h / 2 - this.camOffsetY;
     for (const cam of [this.cameras.main, this.overlayCam]) {
       cam.setZoom(z);
-      cam.centerOn(b.x + b.w / 2 + dx / z, b.y + b.h / 2 + dy / z);
+      cam.centerOn(cx + dx / z, cy + dy / z);
     }
   }
 
@@ -440,7 +465,10 @@ export class GameScene extends Phaser.Scene {
           break;
         }
         case 'COUNTDOWN': {
-          this.juice.countdown(e.n, this.geom.door.cx, -CELL * 1.5);
+          // Цифра на стене — по ту сторону от двери, чтобы не закрывать выход.
+          const doorLeft = this.geom.door.cx < this.geom.floorW / 2;
+          const x = this.geom.floorW * (doorLeft ? 0.74 : 0.26);
+          this.juice.countdown(e.n, x, -this.geom.northH * 0.62);
           break;
         }
         case 'ESCAPED': {

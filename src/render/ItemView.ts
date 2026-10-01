@@ -8,6 +8,7 @@ import type { Art } from '../art/ArtFactory';
 import { GEM_KIND_BY_CODE, SPR } from '../art/manifest';
 import { isGem } from '../core/rules';
 import type { GridShape } from '../core/grid';
+import { blend } from './blend';
 import { cellBase, CELL } from './geometry';
 import type { Layers } from './layers';
 
@@ -17,7 +18,6 @@ interface ItemSprite {
   root: Phaser.GameObjects.Container;
   body: Phaser.GameObjects.Image;
   pedestal: Phaser.GameObjects.Image | null;
-  shine: Phaser.GameObjects.Image | null;
   shadow: Phaser.GameObjects.Image;
   halo: Phaser.GameObjects.Image | null;
   glint: Phaser.GameObjects.Image;
@@ -60,23 +60,18 @@ export class ItemView {
     this.layers.shadows.add(shadow);
     let pedestal: Phaser.GameObjects.Image | null = null;
     let halo: Phaser.GameObjects.Image | null = null;
-    let shine: Phaser.GameObjects.Image | null = null;
     let body: Phaser.GameObjects.Image;
     if (gem) {
       const kind = GEM_KIND_BY_CODE[code];
       pedestal = this.art.img(0, 0, SPR.pedestal);
-      body = this.art.img(0, -18, SPR.gem[kind]);
+      body = this.art.img(0, -18, SPR.gem[kind]).setBlendMode(blend.emissive);
       root.add([pedestal, body]);
       halo = this.art.img(b.x, b.y - 30, SPR.halo[kind]);
       halo.setBlendMode(Phaser.BlendModes.ADD);
       this.layers.overlay.add(halo);
     } else {
-      body = this.art.img(0, 0, SPR.coin);
-      shine = this.art.img(0, 0, SPR.coinShine);
-      shine.setBlendMode(Phaser.BlendModes.ADD);
-      shine.setAlpha(0);
+      body = this.art.img(0, 0, SPR.coin).setBlendMode(blend.emissive);
       root.add([body]);
-      this.layers.overlay.add(shine);
     }
     const glint = this.art.img(b.x, b.y, SPR.glint);
     glint.setAlpha(0);
@@ -90,7 +85,6 @@ export class ItemView {
       root,
       body,
       pedestal,
-      shine,
       shadow,
       halo,
       glint,
@@ -136,7 +130,6 @@ export class ItemView {
     it.dead = true;
     it.shadow.destroy();
     it.halo?.destroy();
-    it.shine?.destroy();
     it.glint.destroy();
     it.pedestal?.destroy();
     // Летящий предмет — поверх света, в слое 5.
@@ -197,7 +190,6 @@ export class ItemView {
     this.items.delete(cell);
     it.dead = true;
     it.halo?.destroy();
-    it.shine?.destroy();
     it.glint.destroy();
     const dur = this.reduced ? 1 : balance.anim.sandSinkMs;
     const parts = [it.body, ...(it.pedestal ? [it.pedestal] : [])];
@@ -231,8 +223,7 @@ export class ItemView {
       it.root.destroy();
       it.shadow.destroy();
       it.halo?.destroy();
-      it.shine?.destroy();
-      it.glint.destroy();
+        it.glint.destroy();
     }
     this.items.clear();
   }
@@ -257,21 +248,17 @@ export class ItemView {
       } else {
         it.body.angle = this.reduced ? 0 : bob * 4;
         it.body.y = -1.5 * Math.max(0, bob);
-        // Диагональный блик раз в 2–4 с, фазы случайные.
-        if (it.shine) {
-          if (it.shineT < 0 && t >= it.nextShine) it.shineT = 0;
-          if (it.shineT >= 0) {
-            it.shineT += dt / 420;
-            const k = it.shineT;
-            it.shine.setPosition(it.root.x + (k - 0.5) * 30, it.root.y - 22 + (k - 0.5) * 10);
-            it.shine.setAlpha(Math.sin(Math.min(1, k) * Math.PI) * 0.95);
-            if (k >= 1) {
-              it.shineT = -1;
-              it.shine.setAlpha(0);
-              const a = balance.anim;
-              it.nextShine = t + a.coinShineMinMs + this.rng() * (a.coinShineMaxMs - a.coinShineMinMs);
-            }
-          }
+        // Диагональный блик раз в 2–4 с, фазы случайные (кадры с бликом запечены в текстуру).
+        if (it.shineT < 0 && t >= it.nextShine) it.shineT = 0;
+        if (it.shineT >= 0) {
+          it.shineT += dt / 380;
+          const k = Math.floor(it.shineT * 5);
+          if (k >= 5) {
+            it.shineT = -1;
+            this.art.setFrame(it.body, SPR.coin);
+            const a = balance.anim;
+            it.nextShine = t + a.coinShineMinMs + this.rng() * (a.coinShineMaxMs - a.coinShineMinMs);
+          } else this.art.setFrame(it.body, `coin.s${k}`);
         }
       }
       // Глинт-звёздочка: изредка вспыхивает.

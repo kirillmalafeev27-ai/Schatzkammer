@@ -36,7 +36,7 @@ const STYLE: Record<SfxKey, { fill: string; outer: string; size: WordSize; burst
   zuSpaet: { fill: palette.bad, outer: palette.ink, size: 'huge', burst: palette.paper },
 };
 
-const SIZE_PX: Record<WordSize, number> = { small: 34, big: 46, huge: 74 };
+const SIZE_PX: Record<WordSize, number> = { small: 36, big: 50, huge: 92 };
 
 export interface Avoid {
   x: number;
@@ -87,11 +87,11 @@ export class Juice {
   }
 
   countdown(n: number, x: number, y: number): void {
-    const digit: SfxStyle = { fill: n <= 3 ? palette.bad : palette.caption, outer: palette.ink, size: 96, burst: null, skew: -0.1 };
-    const wordStyle: SfxStyle = { fill: palette.white, outer: n <= 3 ? palette.bad : palette.hero.scarf, size: 30, burst: null, skew: -0.1 };
+    const digit: SfxStyle = { fill: n <= 3 ? palette.bad : palette.caption, outer: palette.ink, size: 150, burst: n <= 3 ? palette.paper : null, skew: -0.1 };
+    const wordStyle: SfxStyle = { fill: palette.white, outer: n <= 3 ? palette.bad : palette.hero.scarf, size: 40, burst: null, skew: -0.1 };
     const label = (this.lang === 'de' ? countdownDe : countdownRu)[n] ?? '';
     this.spawn(String(n), digit, x, y, 1, true);
-    this.spawn(label, wordStyle, x, y + 70, 1, true);
+    this.spawn(label, wordStyle, x, y + 104, 1, true);
   }
 
   private spawn(text: string, style: SfxStyle, x: number, y: number, scale: number, fixed = false): void {

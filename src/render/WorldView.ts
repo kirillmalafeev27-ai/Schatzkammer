@@ -7,6 +7,7 @@ import { SPR, TEX } from '../art/manifest';
 import { cellIndex, cellXY, exitIndex } from '../core/grid';
 import { Obstacle, type GeneratedLevel } from '../core/levelGen';
 import { hashSeed, mulberry32 } from '../core/rng';
+import { blend } from './blend';
 import { DEPTH } from './DoorView';
 import { cellBase, CELL, type WorldGeom } from './geometry';
 import type { Layers } from './layers';
@@ -36,6 +37,8 @@ export class WorldView {
   private time = 0;
   private reduced = false;
   private readonly rng: () => number;
+  /** Пылинки, висящие в воздухе зала: в пятнах света они вспыхивают, в тени — тонут. */
+  private readonly dust: { img: Phaser.GameObjects.Image; x: number; y: number; vx: number; vy: number; ph: number }[] = [];
 
   constructor(
     private readonly scene: Phaser.Scene,
@@ -45,6 +48,7 @@ export class WorldView {
     private readonly layers: Layers,
   ) {
     this.rng = mulberry32(hashSeed(level.usedSeed, 4242));
+    this.dustBounds = { w: geom.floorW, y0: -CELL * 1.3, y1: geom.floorH };
     layers.bg.add(art.baked(TEX.cave));
     layers.floor.add(art.baked(TEX.floor));
     const walls = art.baked(TEX.walls).setDepth(DEPTH.walls);
@@ -72,22 +76,38 @@ export class WorldView {
     for (const t of geom.torches) {
       const holder = art.img(t.x, t.y, SPR.torchHolder).setDepth(DEPTH.wallProps);
       const frame = Math.floor(this.rng() * SPR.flames.length);
-      const flame = art.img(t.x, t.y - 16, SPR.flames[frame]).setDepth(DEPTH.wallProps + 1);
+      const flame = art.img(t.x, t.y - 16, SPR.flames[frame]).setDepth(DEPTH.wallProps + 1).setBlendMode(blend.emissive);
       layers.objects.add([holder, flame]);
       this.torches.push({ holder, flame, frame, next: this.rng() * 90, embers: [], x: t.x, y: t.y - 30 });
     }
 
+    for (let i = 0; i < 46; i++) {
+      const img = art.img(0, 0, SPR.softDot).setBlendMode(blend.addKeep);
+      img.setScale(art.baseScale(SPR.softDot) * (0.16 + this.rng() * 0.22));
+      layers.atmos.add(img);
+      this.dust.push({
+        img,
+        x: this.rng() * geom.floorW,
+        y: -CELL * 1.2 + this.rng() * (geom.floorH + CELL),
+        vx: (this.rng() - 0.5) * 0.008,
+        vy: -0.003 - this.rng() * 0.006,
+        ph: this.rng() * 6.28,
+      });
+    }
+
     for (const c of geom.crystals) {
-      const glow = art.img(c.x, c.y, SPR.lightSpot).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0);
+      const glow = art.img(c.x, c.y, SPR.lightSpot).setBlendMode(blend.addKeep).setAlpha(0);
       glow.setScale(art.baseScale(SPR.lightSpot) * 1.4 * c.s);
       glow.setTint(0x9ff5ec);
       layers.atmos.add(glow);
       this.crystalGlows.push({ img: glow, phase: this.rng() * 6 });
-      const gl = art.img(c.x, c.y, SPR.glint).setAlpha(0);
+      const gl = art.img(c.x, c.y, SPR.glint).setAlpha(0).setBlendMode(blend.emissive);
       layers.atmos.add(gl);
       this.crystalGlints.push({ img: gl, phase: this.rng(), x: c.x + (this.rng() - 0.5) * 20 * c.s, y: c.y - 14 * c.s });
     }
   }
+
+  private dustBounds = { w: 1, y0: 0, y1: 1 };
 
   setReducedMotion(v: boolean): void {
     this.reduced = v;
@@ -130,7 +150,7 @@ export class WorldView {
       }
       // Искры.
       if (!this.reduced && this.rng() < dt / 260) {
-        const img = this.art.img(t.x + (this.rng() - 0.5) * 14, t.y, SPR.ember).setBlendMode(Phaser.BlendModes.ADD);
+        const img = this.art.img(t.x + (this.rng() - 0.5) * 14, t.y, SPR.ember).setBlendMode(blend.emissive);
         this.layers.atmos.add(img);
         t.embers.push({ img, life: 1, vx: (this.rng() - 0.5) * 0.03, vy: -0.05 - this.rng() * 0.05 });
       }
@@ -145,6 +165,20 @@ export class WorldView {
           t.embers.splice(i, 1);
         }
       }
+    }
+    const W = this.dust.length ? this.dustBounds : null;
+    for (const d of this.dust) {
+      if (!this.reduced) {
+        d.x += d.vx * dt + Math.sin(this.time / 1400 + d.ph) * 0.02;
+        d.y += d.vy * dt;
+      }
+      if (W) {
+        if (d.y < W.y0) d.y = W.y1;
+        if (d.x < 0) d.x += W.w;
+        if (d.x > W.w) d.x -= W.w;
+      }
+      d.img.setPosition(d.x, d.y);
+      d.img.setAlpha(0.22 + 0.2 * Math.sin(this.time / 900 + d.ph));
     }
     for (const c of this.crystalGlows) {
       const p = this.reduced ? 0.5 : 0.5 + 0.5 * Math.sin((this.time / balance.light.crystal.pulseMs) * Math.PI * 2 + c.phase);

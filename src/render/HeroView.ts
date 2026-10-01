@@ -5,7 +5,7 @@ import Phaser from 'phaser';
 import { balance, stepAnimMs } from '../config/balance';
 import type { Art } from '../art/ArtFactory';
 import { SPR } from '../art/manifest';
-import { CELL } from './geometry';
+import { HERO_RIG as R } from '../art/recipes/hero';
 
 type Mood = 'neutral' | 'worried' | 'strain' | 'happy';
 
@@ -65,32 +65,34 @@ export class HeroView {
     this.rng = rng;
     const H = SPR.hero;
     this.root = scene.add.container(x, y);
+    this.destX = x;
+    this.destY = y;
     this.body = scene.add.container(0, 0);
-    this.upper = scene.add.container(0, -46);
-    this.headC = scene.add.container(2, -54);
+    this.upper = scene.add.container(R.upper.x, R.upper.y);
+    this.headC = scene.add.container(R.head.x, R.head.y);
 
-    this.bag = art.img(-20, -36, H.bag[0]);
-    this.legB = art.img(-7, -48, H.legB);
-    this.legF = art.img(8, -48, H.legF);
-    this.bootB = art.img(-8, -2, H.bootB);
-    this.bootF = art.img(9, -2, H.bootF);
-    this.armB = art.img(-14, -42, H.armB);
-    this.torso = art.img(0, 0, H.torso);
-    this.lantern = art.img(16, -8, H.lantern);
-    this.scarfTail = art.img(-10, -50, H.scarfTail);
-    this.scarf = art.img(1, -50, H.scarf);
-    this.armF = art.img(15, -42, H.armF);
+    this.bag = art.img(R.bag.x, R.bag.y, H.bag[0]);
+    this.legB = art.img(R.legB.x, R.legB.y, H.legB);
+    this.legF = art.img(R.legF.x, R.legF.y, H.legF);
+    this.bootB = art.img(R.bootB.x, R.bootB.y, H.bootB);
+    this.bootF = art.img(R.bootF.x, R.bootF.y, H.bootF);
+    this.armB = art.img(R.armB.x, R.armB.y, H.armB);
+    this.torso = art.img(R.torso.x, R.torso.y, H.torso);
+    this.lantern = art.img(R.lantern.x, R.lantern.y, H.lantern);
+    this.scarfTail = art.img(R.scarfTail.x, R.scarfTail.y, H.scarfTail);
+    this.scarf = art.img(R.scarf.x, R.scarf.y, H.scarf);
+    this.armF = art.img(R.armF.x, R.armF.y, H.armF);
     this.headImg = art.img(0, 0, H.head);
-    this.eyes = art.img(9, -26, H.eyes);
-    this.brows = art.img(9, -36, H.browsNeutral);
-    this.mouth = art.img(12, -10, H.mouthSmile);
-    this.hat = art.img(0, -34, H.hat);
-    this.sweat = art.img(-22, -40, H.sweat).setVisible(false);
+    this.eyes = art.img(R.eyes.x, R.eyes.y, H.eyes);
+    this.brows = art.img(R.brows.x, R.brows.y, H.browsNeutral);
+    this.mouth = art.img(R.mouth.x, R.mouth.y, H.mouthSmile);
+    this.hat = art.img(R.hat.x, R.hat.y, H.hat);
+    this.sweat = art.img(R.sweat.x, R.sweat.y, H.sweat).setVisible(false);
 
     this.headC.add([this.headImg, this.eyes, this.brows, this.mouth, this.hat, this.sweat]);
     this.upper.add([this.bag, this.armB, this.torso, this.lantern, this.scarfTail, this.scarf, this.headC, this.armF]);
     this.body.add([this.legB, this.bootB, this.legF, this.bootF, this.upper]);
-    this.pips = scene.add.container(0, -CELL * 1.42);
+    this.pips = scene.add.container(0, R.pips.y);
     this.root.add([this.body]);
     this.blinkAt = 1500 + rng() * 2000;
     this.nextLookBack = 2000;
@@ -111,6 +113,9 @@ export class HeroView {
   get y(): number {
     return this.root.y;
   }
+  /** Куда герой придёт после текущего прыжка (для раскладки слов-звуков). */
+  destX = 0;
+  destY = 0;
 
   /** Мировая позиция фонаря (для света). */
   lanternPos(): { x: number; y: number } {
@@ -129,7 +134,7 @@ export class HeroView {
       this.pips.add(im);
       this.pipImgs.push(im);
     }
-    const spacing = 24;
+    const spacing = 30;
     this.pipImgs.forEach((im, i) => {
       im.setVisible(i < need);
       if (i >= need) return;
@@ -179,6 +184,8 @@ export class HeroView {
   hopTo(x: number, y: number, cost: number, onLand?: () => void): void {
     const dur = stepAnimMs(cost);
     this.stepping?.stop();
+    this.destX = x;
+    this.destY = y;
     const fromX = this.root.x;
     const fromY = this.root.y;
     const hopH = this.reduced ? 0 : 16 + 4 * Math.max(0, 3 - cost);
@@ -228,6 +235,8 @@ export class HeroView {
     this.stepping = null;
     this.hopping = false;
     this.root.setPosition(x, y);
+    this.destX = x;
+    this.destY = y;
     this.body.setScale(this.facing, 1);
   }
 
@@ -249,7 +258,11 @@ export class HeroView {
     // Дыхание.
     const breath = this.reduced ? 0 : Math.sin((t / balance.anim.breatheMs) * Math.PI * 2);
     this.torso.scaleY = this.art.baseScale(H.torso) * (1 + 0.025 * breath);
-    this.headC.y = -54 - 1.2 * breath;
+    this.headC.y = R.head.y - 1.2 * breath;
+    // Руки покачиваются при ходьбе.
+    const swing = this.hopping && !this.reduced ? Math.sin(t / 45) * 14 : Math.sin(t / 700) * 2;
+    this.armF.angle = swing;
+    this.armB.angle = -swing;
 
     // Наклон корпуса по весу (в сторону взгляда — у контейнера уже есть scaleX).
     const leanRad = Phaser.Math.DegToRad(this.lean);
@@ -278,10 +291,10 @@ export class HeroView {
     // Готовность: притоптывает.
     if (this.pose.ready && !this.hopping && !this.reduced) {
       const tap = Math.max(0, Math.sin(t / 110));
-      this.bootF.y = -2 - tap * 4;
+      this.bootF.y = R.bootF.y - tap * 4;
       this.bootF.angle = -tap * 14;
     } else {
-      this.bootF.y = -2;
+      this.bootF.y = R.bootF.y;
       this.bootF.angle = 0;
     }
 
@@ -294,12 +307,12 @@ export class HeroView {
     // Пот.
     if (this.sweat.visible) {
       const k = ((t / 700) % 1 + 1) % 1;
-      this.sweat.y = -40 + k * 14;
+      this.sweat.y = R.sweat.y + k * 14;
       this.sweat.alpha = 1 - k;
     }
 
     // Сапоги-заряды покачиваются над головой.
-    this.pips.setPosition(this.root.x, this.root.y - CELL * 1.36 + (this.reduced ? 0 : Math.sin(t / 300) * 1.5));
+    this.pips.setPosition(this.root.x, this.root.y + R.pips.y + (this.reduced ? 0 : Math.sin(t / 300) * 1.5));
   }
 
   setVisible(v: boolean): void {
