@@ -1,11 +1,17 @@
 // Встраивание (раздел 13.4): mountTreasury(container, options) → { destroy }.
 
-import '@fontsource/rubik/400.css';
-import '@fontsource/rubik/500.css';
-import '@fontsource/rubik/700.css';
-import '@fontsource/rubik/800.css';
-import '@fontsource/rubik/900.css';
-import '@fontsource/bangers/400.css';
+// Только нужные подмножества: русский интерфейс и немецкие слова.
+import '@fontsource/rubik/latin-400.css';
+import '@fontsource/rubik/cyrillic-400.css';
+import '@fontsource/rubik/latin-500.css';
+import '@fontsource/rubik/cyrillic-500.css';
+import '@fontsource/rubik/latin-700.css';
+import '@fontsource/rubik/cyrillic-700.css';
+import '@fontsource/rubik/latin-800.css';
+import '@fontsource/rubik/cyrillic-800.css';
+import '@fontsource/rubik/latin-900.css';
+import '@fontsource/rubik/cyrillic-900.css';
+import '@fontsource/bangers/latin-400.css';
 import './ui/styles.css';
 
 import { App, type FinishResult } from './game/App';

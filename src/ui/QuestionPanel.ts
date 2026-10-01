@@ -23,6 +23,7 @@ export class QuestionPanel {
   private readonly pipsLabel: HTMLElement;
   private readonly hoppla: HTMLElement;
   private readonly live: HTMLElement;
+  private readonly rules: HTMLElement;
   private buttons: HTMLButtonElement[] = [];
   private current: Question | null = null;
   private nextQ: Promise<Question> | null = null;
@@ -54,6 +55,7 @@ export class QuestionPanel {
     this.hoppla = h('div', { class: 'tz-hoppla', 'aria-hidden': 'true' }, 'HOPPLA!');
     this.live = h('div', { class: 'tz-sr', 'aria-live': 'polite' });
     const ready = h('div', { class: 'tz-ready' }, ru.getReady);
+    this.rules = h('div', { class: 'tz-rules' });
     const foot = h('div', { class: 'tz-q-foot' }, ru.footerControls);
     this.el = h(
       'section',
@@ -61,6 +63,7 @@ export class QuestionPanel {
       head,
       this.body,
       ready,
+      this.rules,
       foot,
       this.hoppla,
       this.live,
@@ -77,8 +80,28 @@ export class QuestionPanel {
     this.hoppla.textContent = text;
   }
 
+  /** Меню: вместо вопроса — три шага правил с картинками. */
+  showRules(icons: string[]): void {
+    this.stop();
+    this.el.classList.remove('is-intro', 'is-awaiting', 'is-paused');
+    this.el.classList.add('is-rules');
+    this.rules.replaceChildren(
+      h('div', { class: 'tz-caption tz-rules-title' }, ru.rulesTitle),
+      ...ru.rules.map((text, i) =>
+        h(
+          'div',
+          { class: 'tz-rule' },
+          h('span', { class: 'tz-rule-n' }, String(i + 1)),
+          icons[i] ? h('img', { class: 'tz-rule-icon', src: icons[i], alt: '' }) : null,
+          h('span', { class: 'tz-rule-text' }, text),
+        ),
+      ),
+    );
+  }
+
   /** Новый раунд: «Приготовься…», первый вопрос грузится заранее. */
   startRound(provider: QuestionProvider): void {
+    this.el.classList.remove('is-rules');
     this.provider = provider;
     this.gen++;
     this.mode = 'intro';

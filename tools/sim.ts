@@ -133,11 +133,14 @@ if (isMain) {
   const p = Number(arg('p', '0.8'));
   const lv = arg('level', 'all');
   const ids = lv === 'all' ? levels.map((l) => l.id) : [Number(lv)];
+  const override = arg('override', '');
   const pct = (x: number) => `${(x * 100).toFixed(0).padStart(3)}%`;
   console.log(`Симуляция: ${runs} раундов на стратегию, T_med = ${tMed} мс, p = ${p}`);
   console.log('ур. | стратегия  | выход | добыча | ценность | звёзды | цель');
   for (const id of ids) {
-    const rep = simulate(id, runs, tMed, p);
+    const cfg = override ? { ...getLevel(id), ...JSON.parse(override) } : undefined;
+    if (cfg) console.log(`  вариант: ${override}`);
+    const rep = simulate(id, runs, tMed, p, cfg);
     const bestEv = Math.max(...rep.map((r) => r.ev));
     for (const r of rep) {
       const goal =

@@ -75,7 +75,7 @@ async function run(): Promise<void> {
     const dpr = w < 800 ? 2 : 1;
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: dpr, hasTouch: w < 800 });
     const page = await ctx.newPage();
-    if (scenario !== 'tutorial') {
+    if (scenario !== 'ui') {
       await page.addInitScript(() => localStorage.setItem('treasury:tutorial', JSON.stringify({ start: true, heavy: true, risk: true })));
     }
     const logs: string[] = [];
@@ -120,6 +120,37 @@ async function run(): Promise<void> {
       await page.screenshot({ path: `${out}/${tag}-6-escape.png` });
       await page.waitForTimeout(4500);
       await page.screenshot({ path: `${out}/${tag}-7-results.png` });
+    }
+    if (scenario === 'all' || scenario === 'lose') {
+      await tz(page, 'start', 2);
+      await tz(page, 'skipIntro');
+      await page.waitForTimeout(300);
+      await playSome(page, 5);
+      const s3 = await tz<any>(page, 'state');
+      await tz(page, 'setTime', s3.D - 300);
+      await page.waitForTimeout(900);
+      await page.screenshot({ path: `${out}/${tag}-8-locked.png` });
+      await page.waitForTimeout(4500);
+      await page.screenshot({ path: `${out}/${tag}-9-lose-results.png` });
+    }
+    if (scenario === 'ui') {
+      await page.getByRole('button', { name: 'Играть' }).click();
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${out}/${tag}-u1-levels.png` });
+      await page.locator('.tz-level').first().click();
+      await page.waitForTimeout(900);
+      await page.screenshot({ path: `${out}/${tag}-u2-intro.png` });
+      await tz(page, 'skipIntro');
+      await page.waitForTimeout(700);
+      await page.screenshot({ path: `${out}/${tag}-u3-tutorial.png` });
+      await tz(page, 'closeBubble');
+      await page.waitForTimeout(300);
+      await page.keyboard.press('p');
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${out}/${tag}-u4-pause.png` });
+      await page.getByRole('button', { name: 'Настройки' }).click();
+      await page.waitForTimeout(500);
+      await page.screenshot({ path: `${out}/${tag}-u5-settings.png` });
     }
     const errs = logs.filter((l) => l.includes('error') || l.includes('pageerror'));
     console.log(`${tag}: ${errs.length ? errs.join('\n') : 'без ошибок'}`);

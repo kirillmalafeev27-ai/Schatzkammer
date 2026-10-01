@@ -312,6 +312,7 @@ export class App implements SceneBridge {
     const url = (name: string, hgt = 40) => f.frameToCanvas(name, hgt)?.toDataURL() ?? '';
     this.panel.setIcons({ pipFull: url(SPR.pipFull, 26), pipEmpty: url(SPR.pipEmpty, 26) });
     this.bag.setIcons({ bag: url(SPR.hero.bag[2], 40), coin: url(SPR.coin, 22), gem: url(SPR.gem.ruby, 22) });
+    this.ruleIcons = [url(SPR.pipFull, 56), url(SPR.hero.bag[3], 64), url(SPR.door.slab, 64)];
     this.iconCache = {
       coin: url(SPR.coin, 30),
       ruby: url(SPR.gem.ruby, 30),
@@ -320,6 +321,7 @@ export class App implements SceneBridge {
     };
   }
   private iconCache: Record<string, string> = {};
+  private ruleIcons: string[] = [];
 
   private setWorldUiVisible(v: boolean): void {
     this.bag.el.style.visibility = v ? 'visible' : 'hidden';
@@ -334,8 +336,7 @@ export class App implements SceneBridge {
     this.endRound();
     this.phase = 'menu';
     this.setWorldUiVisible(false);
-    this.panel.stop();
-    this.panel.el.classList.add('is-intro');
+    this.panel.showRules(this.ruleIcons);
     const level = generateLevel(getLevel(1), { seed: freshSeed(), cols: this.gridCols, rows: this.gridRows });
     const state = createState(level, computePace(this.save.pace));
     this.scene?.showAttract(level, state);
@@ -368,6 +369,7 @@ export class App implements SceneBridge {
     this.audio.play('ui');
     this.screens.show(
       levelsScreen(this.save, {
+        doorIcon: this.ruleIcons[2],
         onPick: (id) => {
           this.audio.play('ui', { pitch: 1.3 });
           this.startRound(id);

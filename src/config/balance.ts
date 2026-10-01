@@ -64,7 +64,7 @@ export const balance = {
   levelGen: {
     doorCornerMargin: 2,
     /** Номинальная точность для бюджета B = doorAnswers × accuracy. */
-    budgetAccuracy: 0.7,
+    budgetAccuracy: 0.66,
     /** Собрать всё и выйти должно стоить не меньше mustExceed × B. */
     mustExceed: 1.5,
     /** Хотя бы один камень можно вынести за gemReach × B. */

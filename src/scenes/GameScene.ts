@@ -473,11 +473,14 @@ export class GameScene extends Phaser.Scene {
         }
         case 'ESCAPED': {
           this.hero.celebrate();
+          this.hero.pipsContainer.setVisible(false);
           this.juice.word(e.timeLeftMs < balance.door.narrowEscapeMs ? 'knapp' : 'geschafft', this.geom.door.cx, CELL * 1.6, { lift: 0 });
           break;
         }
         case 'LOCKED_IN': {
           this.lockedAnim = true;
+          this.hero.pipsContainer.setVisible(false);
+          this.hero.setMood('worried');
           this.door.close();
           this.juice.shake(balance.anim.shakeBigPx * this.dpr, 520);
           this.juice.word('rumms', this.geom.door.cx, -CELL * 0.2, { lift: 0 });

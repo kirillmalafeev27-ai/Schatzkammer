@@ -35,6 +35,19 @@ export class Screens {
   }
 }
 
+function lockSvg(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 28');
+  svg.setAttribute('width', '24');
+  svg.setAttribute('height', '28');
+  svg.innerHTML =
+    '<path d="M6 12V8a6 6 0 0 1 12 0v4" fill="none" stroke="#1b1020" stroke-width="3.2"/>' +
+    '<rect x="2.5" y="11.5" width="19" height="14" rx="2" fill="#ffe066" stroke="#1b1020" stroke-width="2.6"/>' +
+    '<circle cx="12" cy="18" r="2.3" fill="#1b1020"/>';
+  return svg;
+}
+
 const starRow = (n: number, big = false): HTMLElement =>
   h('div', { class: big ? 'tz-stars-big' : 'tz-stars', role: 'img', 'aria-label': ru.stars(n) }, ...[0, 1, 2].map((i) => h('span', { class: `tz-star${i < n ? ' is-on' : ''}` })));
 
@@ -60,24 +73,26 @@ export function menuScreen(opts: { onPlay: () => void; onLevels: () => void; onS
   );
 }
 
-export function levelsScreen(save: SaveData, opts: { onPick: (id: number) => void; onBack: () => void }): HTMLElement {
+export function levelsScreen(save: SaveData, opts: { onPick: (id: number) => void; onBack: () => void; doorIcon?: string }): HTMLElement {
   const cards = levels.map((l) => {
     const unlocked = save.isUnlocked(l.id);
     const pr = save.progress[l.id];
+    const meta = !unlocked ? ru.locked : l.id === ENDLESS_LEVEL_ID ? ru.endless : pr?.best ? ru.best(pr.best) : ' ';
     return h(
       'button',
       {
-        class: 'tz-level',
+        class: `tz-level${l.id === ENDLESS_LEVEL_ID ? ' is-endless' : ''}`,
         type: 'button',
         disabled: !unlocked,
         title: unlocked ? '' : ru.lockedHint,
         'aria-label': `${ru.levelLabel(l.id)}${unlocked ? '' : `, ${ru.locked}`}`,
         onclick: () => opts.onPick(l.id),
       },
+      opts.doorIcon ? h('img', { class: 'tz-level-door', src: opts.doorIcon, alt: '' }) : null,
       h('span', { class: 'tz-level-name' }, ru.levelLabel(l.id)),
-      h('span', { class: 'tz-level-meta' }, l.id === ENDLESS_LEVEL_ID ? ru.endless : pr?.best ? ru.best(pr.best) : ' '),
+      h('span', { class: 'tz-level-meta' }, meta),
       starRow(pr?.stars ?? 0),
-      unlocked ? null : h('span', { class: 'tz-level-lock', 'aria-hidden': 'true' }, '🔒'),
+      unlocked ? null : h('span', { class: 'tz-level-lock', 'aria-hidden': 'true' }, lockSvg()),
     );
   });
   return h(
@@ -304,6 +319,10 @@ export function resultsScreen(d: ResultsData, opts: { onAgain: () => void; onNex
   // Панели появляются по очереди; добыча летит по одной, счётчик ускоряется.
   const ps = [shot, lootPanel, starPanel];
   ps.forEach((p, i) => setTimeout(() => p.classList.add('is-in'), 80 + i * 260));
+  if (!d.escaped) {
+    // Что осталось в сокровищнице: добыча серыми силуэтами.
+    d.bag.forEach((it, i) => setTimeout(() => loot.append(h('img', { src: it.src, alt: '', class: 'is-lost' })), 500 + i * 60));
+  }
   if (d.escaped) {
     let sum = 0;
     let delay = 600;
