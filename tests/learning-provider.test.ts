@@ -1,12 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import { LearningProvider } from '../src/learning/LearningProvider';
-import { AUDIO_DISPLAY_CONTEXT } from '../src/learning/formats';
+import { AUDIO_DISPLAY_CONTEXT, TASK_FORMATS } from '../src/learning/formats';
 import type { LearningSettings } from '../src/learning/settings';
 
 const base: LearningSettings = {
   level: 'B1',
   mode: 'recognition',
-  lexicalTopic: 'Arbeit & Beruf',
+  // Лексическая тема без своих резервных заданий: так резерв отдаёт только задания темы
+  // грамматики, и формат первого вопроса известен заранее.
+  lexicalTopic: 'Zukunft & Lebensplanung',
   grammarTopic: 'Wortstellung im Nebensatz',
 };
 
@@ -14,11 +16,11 @@ const offline = () => Promise.resolve({ ready: false, speech: false });
 const online = () => Promise.resolve({ ready: true, speech: false });
 
 describe('обучающий движок как источник вопросов', () => {
-  it('вопрос выбирается в момент показа и несёт форматы Conveyor', async () => {
+  it('вопрос выбирается в момент показа и несёт свой формат', async () => {
     const provider = new LearningProvider(base, { status: offline });
     expect(provider.prefetch).toBe(false);
     const q = await provider.next();
-    expect(q.instruction).toBe('Соберите из всех частей придаточное предложение.');
+    expect(q.instruction).toBe(TASK_FORMATS.wortstellung.instruction);
     expect(q.meta).toBe('B1 · Wortstellung im Nebensatz');
     expect(q.promptLang).toBe('de');
     expect(q.options).toHaveLength(4);
@@ -34,6 +36,18 @@ describe('обучающий движок как источник вопросо
     expect(q.hint).toBe('Собери предложение и введи его целиком.');
   });
 
+  it('выбор целого предложения и в воспроизведении идёт с вариантами', async () => {
+    const provider = new LearningProvider(
+      { ...base, mode: 'recall', grammarTopic: 'Infinitiv mit zu' },
+      { status: offline },
+    );
+    const q = await provider.next();
+    expect(q.instruction).toBe(TASK_FORMATS.satzvarianten.instruction);
+    expect(q.recall).toBeUndefined();
+    expect(q.options).toHaveLength(4);
+    expect(q.hint).toBe(TASK_FORMATS.satzvarianten.hints.recall);
+  });
+
   it('аудирование не печатает фразу и перевод, варианты по-русски', async () => {
     const provider = new LearningProvider({ ...base, mode: 'audio' }, { status: offline });
     const q = await provider.next();
@@ -41,7 +55,7 @@ describe('обучающий движок как источник вопросо
     expect(q.audioText).toBeTruthy();
     expect(q.translation).toBeUndefined();
     expect(q.optionsLang).toBe('ru');
-    expect(q.meta).toBe('B1 · Arbeit & Beruf');
+    expect(q.meta).toBe('B1 · Zukunft & Lebensplanung');
   });
 
   it('синонимы показывают всё поле слова', async () => {

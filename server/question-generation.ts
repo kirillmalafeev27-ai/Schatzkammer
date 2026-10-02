@@ -1,6 +1,7 @@
-// Генерация пакетов заданий через AITunnel (или любой OpenAI-совместимый API) — правила Conveyor
-// без изменений: те же форматы, свод правил по темам, проверки ответа модели и кэш пакетов.
-// Ключ живёт только на сервере.
+// Генерация пакетов заданий через AITunnel (или любой OpenAI-совместимый API). Грамматические
+// задания собираются по системе Druckmaschine (ветка happy-shannon): девять форматов, свод правил
+// по темам, правило субстанции, проверка ответа модели в `server/exercises/`. Синонимы,
+// аудирование, кэш пакетов и пауза после неудачи — как в Conveyor. Ключ живёт только на сервере.
 
 import {
   DEFAULT_LEARNING_SETTINGS,
@@ -17,13 +18,11 @@ import {
   AUDIO_DISPLAY_CONTEXT,
   AUDIO_QUALITY_RULES,
   EXERCISE_FORMATS,
+  TASK_FORMATS,
   WORD_FIELD_SYNONYM_COUNT,
-  WORD_FIELD_TOPIC,
-  exerciseFormatFor,
+  WORD_FIELD_TOPIC_RULE,
   isWordFieldTopic,
   pickWordFields,
-  qualityRules,
-  topicRuleFor,
   wordFieldFor,
   wordFieldInstruction,
   wordFieldQualityRules,
@@ -35,11 +34,10 @@ import {
   normalizeQuestion,
   questionFingerprint,
   questionHistoryLabel,
-  usesEveryFragment,
-  wordOrderFragments,
-  wordOrderInstruction,
   type GameQuestion,
 } from '../src/learning/questions.ts';
+import { buildExercisePrompt } from './exercises/exercise-prompt.ts';
+import { describeRejections, validateBatch } from './exercises/exercise-validation.ts';
 
 const LEVELS = new Set<string>(LANGUAGE_LEVELS);
 const LEXICAL_TOPIC_SET = new Set<string>(LEXICAL_TOPICS);
@@ -198,48 +196,6 @@ export function isQuestionGenerationReady() {
   return Boolean(config.key && config.baseUrl && config.models.length && typeof fetch === 'function');
 }
 
-const GAP_EXAMPLE = {
-  prompt: 'Вставьте правильную немецкую форму.',
-  context: 'Maria ___ jeden Morgen Kaffee.',
-  translation: 'Мария пьёт кофе каждое утро.',
-  options: ['trinkt', 'trinken', 'trinke', 'trinkst'],
-  correct: 0,
-  correctAnswer: 'trinkt',
-  rule: 'Для sie в Präsens используется форма trinkt.',
-};
-
-function wordOrderExample(prompt: string, isSubordinate: boolean) {
-  return isSubordinate
-    ? {
-        prompt,
-        context: 'Ich bleibe zu Hause, / weil / ich / heute / krank / bin',
-        translation: 'Я остаюсь дома, потому что сегодня болен.',
-        options: [
-          'Ich bleibe zu Hause, weil ich heute krank bin.',
-          'Ich bleibe zu Hause, weil ich bin heute krank.',
-          'Ich bleibe zu Hause, weil bin ich heute krank.',
-          'Ich bleibe zu Hause, ich weil heute krank bin.',
-        ],
-        correct: 0,
-        correctAnswer: 'Ich bleibe zu Hause, weil ich heute krank bin.',
-        rule: 'После weil спрягаемый глагол уходит в конец придаточного.',
-      }
-    : {
-        prompt,
-        context: 'am Wochenende / wir / besuchen / unsere Großeltern',
-        translation: 'На выходных мы навещаем бабушку с дедушкой.',
-        options: [
-          'Am Wochenende besuchen wir unsere Großeltern.',
-          'Am Wochenende wir besuchen unsere Großeltern.',
-          'Wir unsere Großeltern besuchen am Wochenende.',
-          'Unsere Großeltern am Wochenende besuchen wir.',
-        ],
-        correct: 0,
-        correctAnswer: 'Am Wochenende besuchen wir unsere Großeltern.',
-        rule: 'В главном предложении спрягаемый глагол стоит на втором месте.',
-      };
-}
-
 const WORD_FIELD_EXAMPLE = {
   wordField: 'sagen',
   context: 'Das Baby schläft, deshalb ___ wir nur noch.',
@@ -321,7 +277,6 @@ function wordFieldSeed(spec: QuestionSpec) {
 
 function buildWordFieldMessages(spec: QuestionSpec) {
   const fields = pickWordFields(spec.level, wordFieldSeed(spec), wordFieldsPerPackage(spec.count));
-  const topicRule = topicRuleFor(WORD_FIELD_TOPIC);
   return [
     { role: 'system', content: SYSTEM_PROMPT },
     {
@@ -342,7 +297,7 @@ function buildWordFieldMessages(spec: QuestionSpec) {
           synonyms: field.synonyms,
         })),
         qualityRules: wordFieldQualityRules(fields),
-        ...(topicRule ? { topicRule } : {}),
+        topicRule: WORD_FIELD_TOPIC_RULE,
         requirements: [
           'questions содержит ровно count объектов',
           'в каждом объекте ровно поля wordField, context, translation, options, optionBases, correct, correctAnswer, rule',
@@ -363,61 +318,38 @@ function buildWordFieldMessages(spec: QuestionSpec) {
   ];
 }
 
-function buildMessages(spec: QuestionSpec) {
-  if (spec.mode === 'audio') return buildAudioMessages(spec);
-  if (isWordFieldTopic(spec.grammarTopic)) return buildWordFieldMessages(spec);
-  const wordOrderPrompt = wordOrderInstruction(spec.grammarTopic);
-  const isSubordinate = /nebensatz/iu.test(spec.grammarTopic);
-  const format = exerciseFormatFor(spec.grammarTopic);
-  const topicRule = topicRuleFor(spec.grammarTopic);
+/**
+ * Сколько грамматических заданий просить у модели: с запасом на отбраковку, как в Druckmaschine
+ * (там +4 к нужному числу).
+ */
+export function requestedGrammarCount(count: number) {
+  return Math.min(16, count + 4);
+}
+
+function buildGrammarMessages(spec: QuestionSpec) {
   return [
     { role: 'system', content: SYSTEM_PROMPT },
     {
       role: 'user',
-      content: JSON.stringify({
-        task: 'Создать уникальный пакет упражнений по немецкому языку',
+      content: buildExercisePrompt({
         level: spec.level,
-        lexicalTopic: spec.lexicalTopic,
         grammarTopic: spec.grammarTopic,
-        count: spec.count,
+        lexicalTopic: spec.lexicalTopic,
+        count: requestedGrammarCount(spec.count),
         exclude: spec.exclude,
-        exerciseFormat: format.id,
-        // Немецкий свод правил держит задание решаемым только через его тему, поэтому
-        // он уходит с каждым запросом.
-        formatShape: format.shape,
-        qualityRules: qualityRules(spec.grammarTopic),
-        ...(topicRule ? { topicRule } : {}),
-        requirements: [
-          'questions содержит ровно count объектов',
-          'в каждом объекте ровно поля prompt, context, translation, options, correct, correctAnswer, rule',
-          ...(wordOrderPrompt
-            ? [
-                `prompt — ровно строка "${wordOrderPrompt}"`,
-                "context — все части будущего предложения через ' / ' в перемешанном порядке, без финальной точки",
-                'options — четыре полных предложения из этих же частей: заглавная буква, точка, отличие только в порядке слов',
-                'правильный вариант использует каждую часть ровно один раз, три остальных однозначно нарушают порядок',
-                isSubordinate
-                  ? 'среди частей есть подчинительный союз, правильный вариант — придаточное предложение со спрягаемым глаголом в конце'
-                  : 'правильный вариант — главное предложение со спрягаемым глаголом на втором месте',
-              ]
-            : [
-                'prompt — короткая ясная инструкция на русском языке',
-                'context — естественная немецкая фраза с ровно одним пропуском ___',
-              ]),
-          'translation — полный точный русский перевод законченной немецкой фразы',
-          'options — ровно четыре различные немецкие формы без нумерации',
-          'correct — индекс единственного правильного варианта от 0 до 3',
-          'correctAnswer — точная копия options[correct]',
-          'rule — краткое понятное русское объяснение, почему ответ правилен',
-          'лексика строго относится к lexicalTopic, грамматика строго относится к grammarTopic',
-          'сложность не выше level, не повторяй exclude',
-        ],
-        output: {
-          questions: [wordOrderPrompt ? wordOrderExample(wordOrderPrompt, isSubordinate) : GAP_EXAMPLE],
-        },
       }),
     },
   ];
+}
+
+function isGrammarSpec(spec: QuestionSpec) {
+  return spec.mode !== 'audio' && !isWordFieldTopic(spec.grammarTopic);
+}
+
+function buildMessages(spec: QuestionSpec) {
+  if (spec.mode === 'audio') return buildAudioMessages(spec);
+  if (isWordFieldTopic(spec.grammarTopic)) return buildWordFieldMessages(spec);
+  return buildGrammarMessages(spec);
 }
 
 function responseContent(payload: unknown) {
@@ -447,7 +379,7 @@ function responseContent(payload: unknown) {
   return typeof source?.output_text === 'string' ? source.output_text : '';
 }
 
-function parseResponse(raw: string, spec: QuestionSpec) {
+function readRecords(raw: string) {
   const plain = raw
     .replace(/^\s*```(?:json)?\s*/iu, '')
     .replace(/\s*```\s*$/u, '')
@@ -466,15 +398,80 @@ function parseResponse(raw: string, spec: QuestionSpec) {
       // Пробуем следующий кандидат JSON.
     }
   }
+  return records;
+}
 
+function lowerKey(text: string) {
+  return text.normalize('NFKC').toLocaleLowerCase('de-DE');
+}
+
+function mentionsForbidden(question: GameQuestion) {
+  const visibleText = `${question.prompt} ${question.context} ${question.translation} ${question.options.join(' ')} ${question.rule}`;
+  return FORBIDDEN_VISIBLE_REFERENCE.test(visibleText) || FORBIDDEN_GAMEPLAY_CONTEXT.test(visibleText);
+}
+
+/**
+ * Грамматический пакет: общие проверки happy-shannon (`validateBatch`), поверх них — проверки
+ * игры: мир игры и ИИ в тексте, повтор уже выданного, дубль в пакете.
+ */
+function parseGrammarQuestions(records: unknown[], spec: QuestionSpec) {
+  const excluded = new Set(spec.exclude.map(lowerKey));
+  const seen = new Set<string>();
+  const built = new Map<object, GameQuestion>();
+  const candidates = records.slice(0, requestedGrammarCount(spec.count) * 2);
+  const { questions, rejected } = validateBatch(candidates, {
+    grammarTopic: spec.grammarTopic,
+    count: spec.count,
+    check: (item) => {
+      const question = normalizeQuestion(
+        {
+          ...item,
+          prompt: TASK_FORMATS[item.format].instruction,
+          correctAnswer: item.options[item.correct],
+        },
+        built.size,
+      );
+      if (!question) return 'unvollständig';
+      if (mentionsForbidden(question)) return 'Spielwelt oder KI im Text';
+      if (
+        excluded.has(lowerKey(questionHistoryLabel(question))) ||
+        excluded.has(lowerKey(question.context))
+      ) {
+        return 'schon verwendet';
+      }
+      const enriched: GameQuestion = {
+        ...question,
+        level: spec.level,
+        lexicalTopic: spec.lexicalTopic,
+        grammarTopic: spec.grammarTopic,
+      };
+      const fingerprint = questionFingerprint(enriched);
+      if (seen.has(fingerprint)) return 'Aufgabe doppelt';
+      seen.add(fingerprint);
+      built.set(item, enriched);
+      return null;
+    },
+  });
+  const result = questions.slice(0, spec.count).map((item) => built.get(item)!);
+  if (rejected.length) {
+    console.warn(
+      describeRejections(`${spec.grammarTopic} ${spec.level}`, candidates.length, result.length, rejected),
+    );
+  }
+  return result;
+}
+
+function parseResponse(raw: string, spec: QuestionSpec) {
+  const records = readRecords(raw);
+  if (isGrammarSpec(spec)) return parseGrammarQuestions(records, spec);
+
+  // Сюда доходят только аудирование и синонимы.
   const isAudio = spec.mode === 'audio';
-  const isWordField = !isAudio && isWordFieldTopic(spec.grammarTopic);
   const levelFields = new Set(wordFieldsForLevel(spec.level).map((field) => field.base));
   // Синоним может быть правильным ответом только раз за пакет: так пакет расходится по всем
   // пяти синонимам поля, а не по двум самым очевидным.
   const drilled = new Set<string>();
-  const wordOrderPrompt = isAudio ? undefined : wordOrderInstruction(spec.grammarTopic);
-  const excluded = new Set(spec.exclude.map((text) => text.normalize('NFKC').toLocaleLowerCase('de-DE')));
+  const excluded = new Set(spec.exclude.map(lowerKey));
   const seen = new Set<string>();
   const questions: GameQuestion[] = [];
   for (const [index, record] of records.slice(0, spec.count * 3).entries()) {
@@ -487,7 +484,7 @@ function parseResponse(raw: string, spec: QuestionSpec) {
     // вопросом. Словоформы остаются делом модели — как спряжения в задании с пропуском.
     let field: WordField | undefined;
     let optionBases: string[] = [];
-    if (isWordField) {
+    if (!isAudio) {
       field = wordFieldFor(compactText(source.wordField ?? source.wordFieldBase, 40));
       if (!field || !levelFields.has(field.base)) continue;
       const declared = Array.isArray(source.optionBases) ? source.optionBases : [];
@@ -532,26 +529,14 @@ function parseResponse(raw: string, spec: QuestionSpec) {
       if (!/[А-Яа-яЁё]/u.test(question.translation)) continue;
       if (question.options.some((option) => /[А-Яа-яЁё]/u.test(option) || !/[A-Za-zÄÖÜäöüß]/u.test(option)))
         continue;
-      const blankCount = question.context.split('___').length - 1;
-      if (wordOrderPrompt ? blankCount > 0 : blankCount !== 1) continue;
-      // Инструкция обещает, что части складываются в ответ, — задания, где это не так,
-      // отбрасываются.
-      if (
-        wordOrderPrompt &&
-        (wordOrderFragments(question.context).length < 3 ||
-          !usesEveryFragment(question.context, question.options[question.correct]))
-      )
-        continue;
+      if (question.context.split('___').length - 1 !== 1) continue;
     }
-    const visibleText = `${question.prompt} ${question.context} ${question.translation} ${question.options.join(' ')} ${question.rule}`;
-    if (FORBIDDEN_VISIBLE_REFERENCE.test(visibleText) || FORBIDDEN_GAMEPLAY_CONTEXT.test(visibleText))
-      continue;
-    const historyLabel = questionHistoryLabel(question).normalize('NFKC').toLocaleLowerCase('de-DE');
-    const contextKey = (question.audioText ?? question.context).normalize('NFKC').toLocaleLowerCase('de-DE');
+    if (mentionsForbidden(question)) continue;
+    const historyLabel = lowerKey(questionHistoryLabel(question));
+    const contextKey = lowerKey(question.audioText ?? question.context);
     if (excluded.has(historyLabel) || excluded.has(contextKey)) continue;
     const enriched: GameQuestion = {
       ...question,
-      prompt: wordOrderPrompt ?? question.prompt,
       level: spec.level,
       lexicalTopic: spec.lexicalTopic,
       // Аудирование не привязано к грамматической теме.
@@ -640,7 +625,11 @@ async function requestBatch(
       },
       body: JSON.stringify({
         model,
-        max_tokens: Math.max(1400, Math.min(6000, spec.count * 420)),
+        // Целые предложения в вариантах, перевод и разбор длиннее старой подстановки, а
+        // грамматический пакет просят с запасом на отбраковку.
+        max_tokens: isGrammarSpec(spec)
+          ? Math.max(2400, Math.min(9000, requestedGrammarCount(spec.count) * 560))
+          : Math.max(1400, Math.min(6000, spec.count * 420)),
         temperature: 0.82,
         messages: buildMessages(spec),
         ...(useStructuredOutput ? { response_format: { type: 'json_object' } } : {}),

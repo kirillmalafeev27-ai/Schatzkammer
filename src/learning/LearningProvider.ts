@@ -113,6 +113,9 @@ export class LearningProvider implements QuestionProvider {
     const mode = this.settings.mode;
     const format = exerciseFormatOf(question, mode);
     const listening = format.id === 'audio';
+    // Свободный ответ — только там, где материал задания определяет его однозначно; иначе
+    // и в «Воспроизведении» игрок выбирает из вариантов (подсказка говорит об этом).
+    const typed = mode === 'recall' && format.recallable;
     const field = wordFieldFor(question.wordFieldBase);
     // Как в Conveyor — уровень и тема из настроек; у аудирования грамматической темы нет.
     const topic = listening ? this.settings.lexicalTopic : this.settings.grammarTopic;
@@ -130,7 +133,7 @@ export class LearningProvider implements QuestionProvider {
       audioText: question.audioText,
       wordField: field ? { base: field.base, bank: wordFieldBank(field) } : undefined,
       hint: exerciseHint(format, mode),
-      recall: mode === 'recall' && !listening ? { placeholder: format.recallPlaceholder } : undefined,
+      recall: typed ? { placeholder: format.recallPlaceholder } : undefined,
     };
   }
 }

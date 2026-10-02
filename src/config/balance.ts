@@ -178,6 +178,8 @@ export const balance = {
     promptFontMin: 16,
     optionFontMax: 21,
     optionFontMin: 13,
+    /** Целые предложения в тесной компоновке. */
+    optionFontMinCramped: 11.5,
     optionMinHeight: 56,
   },
 

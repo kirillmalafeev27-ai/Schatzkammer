@@ -18,6 +18,9 @@ export interface PanelIcons {
 
 export type PanelMode = 'off' | 'intro' | 'active';
 
+/** Вариант длиннее этого в портрете не делит ряд с соседом. */
+const LONG_OPTION_CHARS = 24;
+
 export class QuestionPanel {
   readonly el: HTMLElement;
   private readonly body: HTMLElement;
@@ -269,6 +272,8 @@ export class QuestionPanel {
       this.buttons = [];
       this.options.replaceChildren();
       this.options.hidden = true;
+      this.options.dataset.long = 'false';
+      this.el.dataset.long = 'false';
       this.recallForm.hidden = false;
       this.recallInput.value = '';
       this.recallInput.placeholder = q.recall.placeholder;
@@ -293,6 +298,10 @@ export class QuestionPanel {
       );
       this.options.replaceChildren(...this.buttons);
       this.options.dataset.count = String(q.options.length);
+      // Целые предложения (сборка, преобразование, исправление ошибки) по два в ряд на телефоне
+      // не читаются — такие варианты идут столбиком и в портрете.
+      this.options.dataset.long = String(q.options.some((text) => text.length > LONG_OPTION_CHARS));
+      this.el.dataset.long = this.options.dataset.long;
     }
     // Разбор прошлого ответа остаётся под новым вопросом, приглушённым, до следующего ответа.
     this.feedbackLine.classList.add('is-past');
@@ -308,22 +317,31 @@ export class QuestionPanel {
    * самых маленьких экранах — в тесную: разбор всплывает поверх задания только на время ответа.
    */
   fit(): void {
-    this.layoutOptions();
-    this.el.classList.remove('is-dense', 'is-cramped');
-    this.fitPrompt();
-    for (const level of ['is-dense', 'is-cramped']) {
-      if (!this.overflowing()) break;
-      this.el.classList.add(level);
+    // Длинные варианты сначала пробуют встать столбиком; если и в тесной компоновке четыре
+    // предложения не помещаются (360 × 640), они возвращаются по два в ряд — там строки
+    // заполняются плотнее и ни один вариант не уходит за край панели.
+    const long = this.options.dataset.long === 'true';
+    for (const stack of long ? [true, false] : [false]) {
+      this.options.dataset.stack = String(stack);
+      this.layoutOptions();
+      this.el.classList.remove('is-dense', 'is-cramped');
       this.fitPrompt();
+      for (const level of ['is-dense', 'is-cramped']) {
+        if (!this.overflowing()) break;
+        this.el.classList.add(level);
+        this.fitPrompt();
+      }
+      if (!this.overflowing()) break;
     }
     this.fitOptions();
   }
 
-  /** Число рядов вариантов: в портрете по два в ряд, в ландшафте — столбиком. */
+  /** Число рядов вариантов: в портрете по два в ряд (длинные — столбиком, если влезают), в ландшафте — столбиком. */
   private layoutOptions(): void {
     const n = this.buttons.length;
     const portrait = this.el.closest<HTMLElement>('.tz')?.dataset.orient === 'portrait';
-    this.options.style.setProperty('--opt-rows', String(portrait ? Math.ceil(n / 2) : n));
+    const pairs = portrait && this.options.dataset.stack !== 'true';
+    this.options.style.setProperty('--opt-rows', String(pairs ? Math.ceil(n / 2) : n));
   }
 
   /** Панель переполнена: либо всё задание, либо ряды вариантов не влезают в оставшееся место. */
@@ -363,6 +381,11 @@ export class QuestionPanel {
       text.scrollWidth <= text.clientWidth + 1 && b.scrollHeight <= b.clientHeight + 1;
     const items: { b: HTMLElement; text: HTMLElement }[] = [];
     let common = Infinity;
+    // Четыре предложения в тесной панели (360 × 640) помещаются только мельче обычного минимума.
+    const minSize =
+      this.el.classList.contains('is-cramped') && this.options.dataset.long === 'true'
+        ? L.optionFontMinCramped
+        : L.optionFontMin;
     for (const b of this.buttons) {
       const text = b.querySelector<HTMLElement>('.tz-opt-text');
       if (!text) continue;
@@ -370,8 +393,8 @@ export class QuestionPanel {
       b.classList.remove('is-tight');
       let size = parseFloat(getComputedStyle(b).fontSize) || L.optionFontMax;
       let guard = 0;
-      while (!fits(b, text) && size > L.optionFontMin && guard++ < 30) {
-        size = Math.max(L.optionFontMin, size - 1.5);
+      while (!fits(b, text) && size > minSize && guard++ < 30) {
+        size = Math.max(minSize, size - 1.5);
         b.style.fontSize = `${size}px`;
       }
       common = Math.min(common, size);

@@ -480,6 +480,15 @@
   grid-column: 1 / 3;
 }
 
+/* Целые предложения — столбиком и в портрете, если панель вмещает четыре ряда. */
+.tz[data-orient='portrait'] .tz-options[data-stack='true'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tz[data-orient='portrait'] .tz-options[data-stack='true'][data-count='3'] > :last-child {
+  grid-column: auto;
+}
+
 .tz[data-orient='landscape'] .tz-options {
   grid-template-columns: minmax(0, 1fr);
   grid-auto-rows: minmax(56px, 1fr);
@@ -1011,10 +1020,12 @@
   line-clamp: 2;
 }
 
-/* Тесная компоновка (360 × 640): банк слова в одну строку, инструкция в одну строку, разбор
-   всплывает поверх задания на время ответа и не занимает места под вариантами. */
+/* Тесная компоновка (360 × 640): банк слова в одну строку, инструкция в одну строку (и перевод,
+   когда варианты — целые предложения), разбор всплывает поверх задания на время ответа и не
+   занимает места под вариантами. */
 .tz-question.is-cramped .tz-prompt-label,
-.tz-question.is-cramped .tz-wordfield {
+.tz-question.is-cramped .tz-wordfield,
+.tz-question.is-cramped[data-long='true'] .tz-translation {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

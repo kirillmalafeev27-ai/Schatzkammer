@@ -1,5 +1,6 @@
 // Настройки обучения — тот же набор, что в Conveyor: уровень, режим, лексическая и грамматическая темы.
-// Списки тем и их группы совпадают с Conveyor дословно: по ним сервер проверяет запрос.
+// Лексические темы совпадают с Conveyor; грамматические дополнены темами Druckmaschine, для
+// которых есть свод правил. По этим спискам сервер проверяет запрос.
 
 export const LANGUAGE_LEVELS = ['A1', 'A2', 'B1', 'B2'] as const;
 
@@ -68,6 +69,7 @@ export const GRAMMAR_TOPICS = [
   'Futur I',
   'Imperativ',
   'Modalverben',
+  'Modalverben in Präteritum',
   'Trennbare Verben',
   'Untrennbare Verben',
   'Reflexive Verben',
@@ -79,11 +81,15 @@ export const GRAMMAR_TOPICS = [
   'Akkusativ',
   'Dativ',
   'Genitiv',
+  'N-Deklination',
   'Artikel',
   'Possessivartikel',
   'Pronomen',
   'Personalpronomen',
+  'Pronomen in Akkusativ',
+  'Pronomen in Dativ',
   'Relativpronomen',
+  'Pronominaladverbien',
   'Fragewörter',
   'Negation',
   'Adjektivdeklination',
@@ -95,6 +101,8 @@ export const GRAMMAR_TOPICS = [
   'Wechselpräpositionen',
   'Präpositionen mit Dativ',
   'Präpositionen mit Akkusativ',
+  'Genitivpräpositionen',
+  'Kausale Präpositionen',
   'Satzklammer',
   'Wortstellung im Hauptsatz',
   'Wortstellung im Nebensatz',
@@ -107,14 +115,15 @@ export const GRAMMAR_TOPICS = [
   'Indirekte Fragen',
   'Infinitiv mit zu',
   'Konjunktiv II',
+  'Konjunktiv I',
   'Passiv',
+  'Zustandspassiv',
   'Plusquamperfekt',
   'Doppelkonjunktionen',
   'als vs. wenn',
   'Partizip I und II',
-  'Genitivpräpositionen',
   // Это лексика, а не грамматика, но проверяет упражнение именно её, поэтому тема выбирается
-  // в том же списке. Держать последней: группы ниже режут список по индексам.
+  // в том же списке.
   'Wortfelder & Synonyme',
 ] as const;
 
@@ -144,14 +153,98 @@ export const LEXICAL_TOPIC_GROUPS: readonly TopicGroup<LexicalTopic>[] = [
   { label: 'Общение и жизненные ситуации', topics: LEXICAL_TOPICS.slice(43) },
 ];
 
+// Группы перечислены явно: темы из Druckmaschine (Modalverben in Präteritum, N-Deklination,
+// Pronomen in Akkusativ/Dativ, Pronominaladverbien, Kausale Präpositionen, Konjunktiv I,
+// Zustandspassiv) встали рядом с родственными, и срезы по индексам больше не годятся.
 export const GRAMMAR_TOPIC_GROUPS: readonly TopicGroup<GrammarTopic>[] = [
-  { label: 'Времена и наклонение', topics: GRAMMAR_TOPICS.slice(0, 6) },
-  { label: 'Глаголы', topics: GRAMMAR_TOPICS.slice(6, 13) },
-  { label: 'Падежи, артикли и местоимения', topics: GRAMMAR_TOPICS.slice(13, 23) },
-  { label: 'Формы слов', topics: GRAMMAR_TOPICS.slice(23, 28) },
-  { label: 'Предлоги', topics: [...GRAMMAR_TOPICS.slice(28, 33), 'Genitivpräpositionen'] },
-  { label: 'Построение предложения', topics: GRAMMAR_TOPICS.slice(33, 44) },
-  { label: 'Продвинутая грамматика', topics: GRAMMAR_TOPICS.slice(44, 50) },
+  {
+    label: 'Времена и наклонение',
+    topics: [
+      'Präsens',
+      'Perfekt',
+      'Präteritum',
+      'Futur I',
+      'Imperativ',
+      'Modalverben',
+      'Modalverben in Präteritum',
+    ],
+  },
+  {
+    label: 'Глаголы',
+    topics: [
+      'Trennbare Verben',
+      'Untrennbare Verben',
+      'Reflexive Verben',
+      'Verben mit Präpositionen',
+      'Lassen',
+      'Werden',
+      'Sein vs. haben',
+    ],
+  },
+  {
+    label: 'Падежи, артикли и местоимения',
+    topics: [
+      'Nominativ',
+      'Akkusativ',
+      'Dativ',
+      'Genitiv',
+      'N-Deklination',
+      'Artikel',
+      'Possessivartikel',
+      'Pronomen',
+      'Personalpronomen',
+      'Pronomen in Akkusativ',
+      'Pronomen in Dativ',
+      'Relativpronomen',
+      'Pronominaladverbien',
+      'Fragewörter',
+    ],
+  },
+  {
+    label: 'Формы слов',
+    topics: ['Negation', 'Adjektivdeklination', 'Komparativ', 'Superlativ', 'Zahlen und Datum'],
+  },
+  {
+    label: 'Предлоги',
+    topics: [
+      'Temporale Präpositionen',
+      'Lokale Präpositionen',
+      'Wechselpräpositionen',
+      'Präpositionen mit Dativ',
+      'Präpositionen mit Akkusativ',
+      'Genitivpräpositionen',
+      'Kausale Präpositionen',
+    ],
+  },
+  {
+    label: 'Построение предложения',
+    topics: [
+      'Satzklammer',
+      'Wortstellung im Hauptsatz',
+      'Wortstellung im Nebensatz',
+      'weil-Sätze',
+      'dass-Sätze',
+      'wenn-Sätze',
+      'obwohl-Sätze',
+      'damit-Sätze',
+      'Relativsätze',
+      'Indirekte Fragen',
+      'Infinitiv mit zu',
+    ],
+  },
+  {
+    label: 'Продвинутая грамматика',
+    topics: [
+      'Konjunktiv II',
+      'Konjunktiv I',
+      'Passiv',
+      'Zustandspassiv',
+      'Plusquamperfekt',
+      'Doppelkonjunktionen',
+      'als vs. wenn',
+      'Partizip I und II',
+    ],
+  },
   { label: 'Лексика', topics: ['Wortfelder & Synonyme'] },
 ];
 

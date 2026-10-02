@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { AUDIO_DISPLAY_CONTEXT, wordFieldInstruction } from '../src/learning/formats';
+import { AUDIO_DISPLAY_CONTEXT, TASK_FORMATS, wordFieldInstruction } from '../src/learning/formats';
 
 type Generation = typeof import('../server/question-generation');
 
@@ -26,22 +26,31 @@ function sentTask(call = 0): Record<string, unknown> {
   return JSON.parse(sentBody(call).messages[1].content);
 }
 
+function sentPrompt(call = 0): string {
+  return sentBody(call).messages[1].content;
+}
+
 const base = { level: 'A2', mode: 'recognition', lexicalTopic: 'Alltag & Routinen', count: 4 };
 
 function gap(i: number, patch: Record<string, unknown> = {}) {
   return {
-    prompt: 'Вставьте правильную немецкую форму.',
-    context: `Ich helfe ___ Mann Nummer ${i}.`,
-    translation: `Я помогаю мужчине номер ${i}.`,
-    options: ['dem', 'den', 'der', 'des'],
+    format: 'luecke',
+    context: `Nach dem Umzug helfe ich ___ aus Wohnung Nummer ${i}.`,
+    translation: `После переезда я помогаю новой соседке из квартиры номер ${i}.`,
+    options: [
+      'meiner neuen Nachbarin',
+      'meine neue Nachbarin',
+      'meiner neue Nachbarin',
+      'meinen neuen Nachbarin',
+    ],
     correct: 0,
-    correctAnswer: 'dem',
-    rule: 'Глагол helfen требует Dativ: dem.',
+    correctAnswer: 'meiner neuen Nachbarin',
+    rule: 'helfen требует Dativ: meiner neuen Nachbarin.',
     ...patch,
   };
 }
 
-describe('генерация пакетов (сервер, правила Conveyor)', () => {
+describe('генерация пакетов (сервер: форматы happy-shannon, синонимы и аудирование Conveyor)', () => {
   beforeEach(() => {
     vi.stubEnv('AITUNNEL_API_KEY', 'test-key');
     vi.stubEnv('AI_BASE_URL', 'https://ai.test/v1');
@@ -77,46 +86,67 @@ describe('генерация пакетов (сервер, правила Convey
     }
   });
 
-  it('подстановка: в запросе свод правил темы, мир игры запрещён; негодные задания отбрасываются', async () => {
+  it('грамматика: запрос собран из свода правил и каталога форматов; брак отбрасывается', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const gen = await load();
     replies.push([
       gap(1),
-      gap(2, { context: 'Ich helfe ___ Mann, ___ Frau.' }),
-      gap(3, { context: 'Я помогаю ___.' }),
-      gap(4, { correctAnswer: 'den' }),
+      gap(2, { context: 'Ich helfe ___ und ___ heute.' }),
+      gap(3, { context: 'Я помогаю ___ сегодня утром.' }),
+      gap(4, { correctAnswer: 'meine neue Nachbarin' }),
       gap(5, { rule: 'Так говорят в Schatzkammer.' }),
       gap(1),
-      gap(6, { options: ['dem', 'dem', 'der', 'des'] }),
-      gap(7),
-      gap(8),
+      gap(6, { options: ['dem', 'den', 'der', 'des'], correctAnswer: 'dem' }),
+      gap(7, { format: 'wortstellung' }),
+      gap(8, { format: undefined }),
       gap(9),
+      gap(10),
+      gap(11),
     ]);
     const questions = await gen.generateQuestions({ ...base, grammarTopic: 'Dativ', exclude: ['x'] });
     expect(questions.map((q) => q.context)).toEqual([
-      'Ich helfe ___ Mann Nummer 1.',
-      'Ich helfe ___ Mann Nummer 7.',
-      'Ich helfe ___ Mann Nummer 8.',
-      'Ich helfe ___ Mann Nummer 9.',
+      'Nach dem Umzug helfe ich ___ aus Wohnung Nummer 1.',
+      'Nach dem Umzug helfe ich ___ aus Wohnung Nummer 9.',
+      'Nach dem Umzug helfe ich ___ aus Wohnung Nummer 10.',
+      'Nach dem Umzug helfe ich ___ aus Wohnung Nummer 11.',
     ]);
     for (const q of questions) {
-      expect(q).toMatchObject({ level: 'A2', lexicalTopic: 'Alltag & Routinen', grammarTopic: 'Dativ' });
+      expect(q).toMatchObject({
+        level: 'A2',
+        lexicalTopic: 'Alltag & Routinen',
+        grammarTopic: 'Dativ',
+        format: 'luecke',
+        prompt: TASK_FORMATS.luecke.instruction,
+      });
     }
     const body = sentBody();
     expect(body.model).toBe('model-a');
     expect(body.messages[0].content).toMatch(/сокровищниц/u);
-    const task = sentTask();
-    expect(task).toMatchObject({ grammarTopic: 'Dativ', exerciseFormat: 'gap', count: 4, exclude: ['x'] });
-    expect(String(task.topicRule)).toMatch(/Dativpräpositionen/u);
-    expect(task.qualityRules).toHaveLength(10);
+    const prompt = sentPrompt();
+    expect(prompt).toMatch(/GRAMMATIK "Dativ"/u);
+    expect(prompt).toMatch(/NIVEAU A2/u);
+    expect(prompt).toMatch(/SUBSTANZ DER OPTIONEN/u);
+    expect(prompt).toMatch(/FORMAT "mehrfachluecke"/u);
+    // Пакет просят с запасом на отбраковку.
+    expect(prompt).toMatch(/Erstelle genau 8 /u);
+    expect(prompt).toMatch(/- x/u);
+    // Причины брака видны в логе.
+    expect(String(warn.mock.calls[0]?.[0])).toMatch(/\[Dativ A2\] 4\/12 .*Füllwort-Optionen/u);
+    warn.mockRestore();
   });
 
-  it('порядок слов: все части в ответе, инструкция темы; ответ модели в ```json``` тоже читается', async () => {
+  it('сборка предложения: все части в ответе, инструкция формата; ответ в ```json``` тоже читается', async () => {
     const gen = await load();
     const item = (i: number, answer: string) => ({
-      prompt: 'что угодно',
-      context: `Er fragt, / ob / ich / morgen / arbeiten / muss${i}`,
+      format: 'wortstellung',
+      context: `muss${i} / ob / Er fragt, / arbeiten / ich / morgen`,
       translation: 'Он спрашивает, должен ли я завтра работать.',
-      options: [answer, 'Er fragt, ob ich muss morgen arbeiten.', 'Er fragt, ob muss ich.', 'Er ob fragt.'],
+      options: [
+        answer,
+        `Er fragt, ob ich muss${i} morgen arbeiten.`,
+        `Er fragt, ob muss${i} ich morgen arbeiten.`,
+        `Er fragt, ob ich morgen muss${i} arbeiten.`,
+      ],
       correct: 0,
       correctAnswer: answer,
       rule: 'В придаточном с ob модальный глагол в конце.',
@@ -126,11 +156,10 @@ describe('генерация пакетов (сервер, правила Convey
     fetchMock.mockImplementationOnce(async () => upstream(questions, true));
     const result = await gen.generateQuestions({ ...base, grammarTopic: 'Wortstellung im Nebensatz' });
     expect(result).toHaveLength(4);
-    expect(result.map((q) => q.context.at(-1))).toEqual(['1', '2', '3', '4']);
-    expect(new Set(result.map((q) => q.prompt))).toEqual(
-      new Set(['Соберите из всех частей придаточное предложение.']),
-    );
-    expect(sentTask().exerciseFormat).toBe('word-order');
+    expect(result.map((q) => q.context.split(' / ')[0])).toEqual(['muss1', 'muss2', 'muss3', 'muss4']);
+    expect(new Set(result.map((q) => q.prompt))).toEqual(new Set([TASK_FORMATS.wortstellung.instruction]));
+    expect(sentPrompt()).toMatch(/FORMAT "wortstellung"/u);
+    expect(sentPrompt()).not.toMatch(/FORMAT "luecke"/u);
   });
 
   it('синонимы: четыре синонима одного поля из каталога, каждый верный — один раз за пакет', async () => {

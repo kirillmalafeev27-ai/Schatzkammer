@@ -1,4 +1,5 @@
-// Порт exercise-format-smoke из Conveyor: форматы, свод правил по темам, поля слов и резерв.
+// Порт exercise-format-smoke из Conveyor: формы заданий, поля слов и резерв. Свод правил по темам
+// и проверка ответа модели — в exercise-rules.test.ts.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
@@ -6,16 +7,14 @@ import { describe, it } from 'vitest';
 import {
   AUDIO_QUALITY_RULES,
   EXERCISE_FORMATS,
-  TOPIC_RULES,
   WORD_FIELDS,
   WORD_FIELD_SYNONYM_COUNT,
   WORD_FIELD_TOPIC,
+  WORD_FIELD_TOPIC_RULE,
   exerciseFormatFor,
   exerciseHint,
   isWordFieldTopic,
   pickWordFields,
-  qualityRules,
-  topicRuleFor,
   usesEveryFragment,
   wordFieldBank,
   wordFieldFor,
@@ -33,6 +32,7 @@ import {
   learningPoolKey,
 } from '../src/learning/settings';
 import {
+  FALLBACK_QUESTIONS,
   WORD_FIELD_FALLBACK_QUESTIONS,
   exerciseFormatOf,
   fallbackQuestionsFor,
@@ -41,50 +41,37 @@ import {
 import type { WordField } from '../src/learning/formats';
 
 describe('форматы упражнений (порт Conveyor)', () => {
-  it('свод правил называет только темы из меню; ASCII-умлауты находят то же правило', () => {
-    const offered = new Set<string>(GRAMMAR_TOPICS);
-    assert.deepEqual(
-      Object.keys(TOPIC_RULES).filter((topic) => !offered.has(topic)),
-      [],
-      'every topic rule must name a grammar topic the setup screen offers',
-    );
-
-    const praeteritum = TOPIC_RULES['Präteritum'];
-    assert.ok(praeteritum);
-    assert.equal(topicRuleFor('Präteritum'), praeteritum);
-    assert.equal(topicRuleFor('Praeteritum'), praeteritum, 'ASCII umlaut spellings must reach the same rule');
-    assert.equal(topicRuleFor('Nominalisierung'), '');
-    assert.equal(topicRuleFor(undefined), '');
-  });
-
-  it('форма задания выбирается темой и режимом', () => {
-    assert.deepEqual(
-      GRAMMAR_TOPICS.filter((topic) => exerciseFormatFor(topic).id === 'word-order'),
-      ['Wortstellung im Hauptsatz', 'Wortstellung im Nebensatz'],
-      'only the word-order topics may leave the gap format',
-    );
+  it('форма задания: аудирование по режиму, синонимы по теме, грамматика — по формату задания', () => {
     assert.deepEqual(
       GRAMMAR_TOPICS.filter((topic) => exerciseFormatFor(topic).id === 'word-field'),
       [WORD_FIELD_TOPIC],
       'exactly one grammar topic may reach the synonym format',
     );
-    assert.equal(exerciseFormatFor('Dativ'), EXERCISE_FORMATS.gap);
-
-    for (const topic of ['Dativ', 'Wortstellung im Hauptsatz']) {
+    assert.equal(exerciseFormatFor('Dativ', 'recognition', 'umformung'), EXERCISE_FORMATS.umformung);
+    assert.equal(exerciseFormatFor('Dativ', 'recall', 'mehrfachluecke'), EXERCISE_FORMATS.mehrfachluecke);
+    assert.equal(
+      exerciseFormatFor('Dativ', 'recognition', 'gap'),
+      EXERCISE_FORMATS.luecke,
+      'an unknown format falls back to the gap with the whole target structure',
+    );
+    for (const topic of ['Dativ', 'Wortstellung im Hauptsatz', WORD_FIELD_TOPIC]) {
       assert.equal(
-        exerciseFormatFor(topic, 'audio'),
+        exerciseFormatFor(topic, 'audio', 'wortstellung'),
         EXERCISE_FORMATS.audio,
         'listening must replace the written shape whatever the grammar topic is',
       );
     }
-    assert.equal(exerciseFormatFor('Dativ', 'recall'), EXERCISE_FORMATS.gap);
     assert.ok(AUDIO_QUALITY_RULES.length >= 4);
+    assert.equal(EXERCISE_FORMATS.audio.recallable, false);
 
     for (const format of Object.values(EXERCISE_FORMATS)) {
       for (const mode of QUESTION_MODES) {
         assert.ok(exerciseHint(format, mode.id), `${format.id} has no hint for ${mode.id}`);
       }
     }
+    // Резервное задание несёт свой формат, и панель берёт подсказки у него.
+    const sentence = FALLBACK_QUESTIONS.find((question) => question.format === 'satzvarianten')!;
+    assert.equal(exerciseFormatOf(sentence, 'recall').recallable, false);
   });
 
   it('узнавание и воспроизведение делят пул, аудирование держит свой', () => {
@@ -110,7 +97,7 @@ describe('форматы упражнений (порт Conveyor)', () => {
     );
   });
 
-  it('порядок слов тратит все части и ничего не добавляет; требования к качеству', () => {
+  it('сборка предложения тратит все части и ничего не добавляет', () => {
     const context = 'am Wochenende / wir / besuchen / unsere Großeltern';
     assert.deepEqual(wordOrderFragments(context), ['am Wochenende', 'wir', 'besuchen', 'unsere Großeltern']);
     assert.ok(usesEveryFragment(context, 'Am Wochenende besuchen wir unsere Großeltern.'));
@@ -122,10 +109,6 @@ describe('форматы упражнений (порт Conveyor)', () => {
       !usesEveryFragment(context, 'Am Wochenende besuchen wir heute unsere Großeltern.'),
       'an invented word must fail the word-order check',
     );
-
-    const rules = qualityRules('Reflexive Verben');
-    assert.equal(rules.length, 10);
-    assert.ok(rules.some((rule) => rule.includes('"Reflexive Verben"')));
   });
 
   it('каталог полей слов: пять синонимов, у каждого оттенок по-русски, без отделяемых глаголов', () => {
@@ -144,7 +127,7 @@ describe('форматы упражнений (порт Conveyor)', () => {
     );
     assert.ok(isWordFieldTopic(WORD_FIELD_TOPIC));
     assert.ok(!isWordFieldTopic('Dativ'));
-    assert.ok(topicRuleFor(WORD_FIELD_TOPIC).length > 80);
+    assert.ok(WORD_FIELD_TOPIC_RULE.length > 80);
 
     const allSynonyms: string[] = [];
     for (const field of WORD_FIELDS) {
