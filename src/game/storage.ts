@@ -1,8 +1,9 @@
-// Сохранения: темп игрока, прогресс по уровням, настройки, флаги обучения.
+// Сохранения: темп игрока, прогресс по уровням, настройки, флаги обучения, выбор темы немецкого.
 // По умолчанию — localStorage с префиксом ключей `treasury:`.
 
 import { levels } from '../config/levels';
 import { parseHistory, type PaceHistory } from '../core/pace';
+import { normalizeLearningSettings, type LearningSettings } from '../learning/settings';
 
 export interface KeyValueStorage {
   get(key: string): string | null;
@@ -83,6 +84,7 @@ export class SaveData {
   progress: Record<number, LevelProgress>;
   pace: PaceHistory;
   tutorial: Record<TutorialFlag, boolean>;
+  learning: LearningSettings;
 
   constructor(store: KeyValueStorage) {
     this.store = store;
@@ -90,6 +92,7 @@ export class SaveData {
     this.progress = readJson<Record<number, LevelProgress>>(store, 'progress', {});
     this.pace = parseHistory(store.get('pace'));
     this.tutorial = readJson(store, 'tutorial', { start: false, heavy: false, risk: false });
+    this.learning = normalizeLearningSettings(readJson<unknown>(store, 'learning', {}));
   }
 
   saveSettings(): void {
@@ -103,6 +106,9 @@ export class SaveData {
   }
   saveTutorial(): void {
     this.store.set('tutorial', JSON.stringify(this.tutorial));
+  }
+  saveLearning(): void {
+    this.store.set('learning', JSON.stringify(this.learning));
   }
 
   /** Следующий уровень открывается, когда текущий пройден хотя бы на одну звезду. */

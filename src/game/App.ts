@@ -25,6 +25,8 @@ import {
   score,
 } from '../core/state';
 import { ru } from '../i18n/ru';
+import { stopQuestionAudio, unlockQuestionAudio } from '../learning/audio';
+import { LearningProvider } from '../learning/LearningProvider';
 import type { QuestionProvider } from '../questions/types';
 import { chooseGrid, computeLayout } from '../render/layout';
 import { CELL } from '../render/geometry';
@@ -55,7 +57,8 @@ export interface FinishResult {
 }
 
 export interface AppOptions {
-  questions: QuestionProvider;
+  /** Внешний источник вопросов; без него работает встроенный обучающий движок. */
+  questions?: QuestionProvider;
   storage: KeyValueStorage;
   level?: number;
   onFinish?: (r: FinishResult) => void;
@@ -84,6 +87,10 @@ export class App implements SceneBridge {
   factory: ArtFactory | null = null;
   readonly save: SaveData;
   readonly audio = new AudioEngine();
+  /** Источник вопросов раунда. */
+  private readonly questions: QuestionProvider;
+  /** Встроенный обучающий движок (если источник не передан снаружи). */
+  private readonly learning: LearningProvider | null;
   round: Round | null = null;
   phase: Phase = 'loading';
   levelId = 1;
@@ -115,6 +122,8 @@ export class App implements SceneBridge {
     private readonly opts: AppOptions,
   ) {
     this.save = new SaveData(opts.storage);
+    this.learning = opts.questions ? null : new LearningProvider(this.save.learning);
+    this.questions = opts.questions ?? this.learning!;
     this.audio.register(presets);
     this.touch = matchMedia?.('(pointer: coarse)').matches ?? false;
     const sysReduced = matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -164,6 +173,8 @@ export class App implements SceneBridge {
     this.setWorldUiVisible(false);
 
     this.listen(window, 'keydown', (e) => this.onKey(e as KeyboardEvent));
+    // Звук аудирования на iOS разрешается только внутри жеста — первый же тап его и покупает.
+    this.listen(this.root, 'pointerdown', () => unlockQuestionAudio());
     this.listen(document, 'visibilitychange', () => {
       if (document.hidden) this.autoPause();
     });
@@ -387,6 +398,7 @@ export class App implements SceneBridge {
 
   showMenu(): void {
     this.endRound();
+    this.learning?.setEnabled(false);
     this.phase = 'menu';
     this.setWorldUiVisible(false);
     this.panel.showRules(this.ruleIcons);
@@ -413,6 +425,7 @@ export class App implements SceneBridge {
 
   private unlockAudio(): void {
     this.audio.unlock();
+    unlockQuestionAudio();
     const s = this.save.settings;
     this.audio.setVolumes(s.sfxVolume, s.ambientVolume, s.muted);
     this.audio.startAmbient();
@@ -420,9 +433,23 @@ export class App implements SceneBridge {
 
   private showLevels(): void {
     this.audio.play('ui');
+    // Пул начинает пополняться, пока игрок выбирает зал: первые вопросы раунда уже из пакета.
+    this.learning?.setEnabled(true);
+    const learning = this.learning;
     this.screens.show(
       levelsScreen(this.save, {
         doorIcon: this.ruleIcons[2],
+        learning: learning
+          ? {
+              settings: this.save.learning,
+              status: learning.status(),
+              onChange: (s) => {
+                this.save.learning = s;
+                this.save.saveLearning();
+                learning.setSettings(s);
+              },
+            }
+          : undefined,
         onPick: (id) => {
           this.audio.play('ui', { pitch: 1.3 });
           this.startRound(id);
@@ -476,7 +503,9 @@ export class App implements SceneBridge {
       this.scene?.geom && this.scene.geom.door.cx < this.scene.geom.floorW * 0.42 ? 'right' : 'left',
     );
     this.setWorldUiVisible(true);
-    this.panel.startRound(this.opts.questions);
+    this.learning?.setEnabled(true);
+    this.learning?.restart();
+    this.panel.startRound(this.questions);
     this.panel.setHoppla(this.save.settings.sfxLang === 'de' ? 'HOPPLA!' : 'ОПА!');
     this.panel.setPaused(false);
     this.coinChain = { n: 0, at: -1e9 };
@@ -839,7 +868,14 @@ export class App implements SceneBridge {
   private onKey(e: KeyboardEvent): void {
     if (this.destroyed) return;
     const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+      // В поле свободного ответа буквы — это ответ; паузу оттуда ставит только Esc.
+      if (tag === 'INPUT' && e.key === 'Escape' && this.phase === 'playing' && !this.screens.open) {
+        e.preventDefault();
+        this.pause();
+      }
+      return;
+    }
     if (e.key === '`' && (import.meta.env.DEV || this.opts.debug)) {
       this.toggleDebug(!this.debugEl);
       return;
@@ -1001,6 +1037,8 @@ export class App implements SceneBridge {
     this.ro?.disconnect();
     for (const [t, type, fn] of this.listeners) t.removeEventListener(type, fn);
     this.audio.destroy();
+    this.learning?.destroy();
+    stopQuestionAudio();
     this.scene?.dispose();
     this.game?.destroy(true);
     this.game = null;

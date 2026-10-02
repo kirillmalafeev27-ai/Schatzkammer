@@ -1,7 +1,9 @@
 import { defineConfig } from 'vite';
+import { learningApi } from './server/vite-plugin.ts';
 
 export default defineConfig({
   base: './',
+  plugins: [learningApi()],
   server: { host: true, port: 5173 },
   preview: { host: true, port: 4173 },
   build: {

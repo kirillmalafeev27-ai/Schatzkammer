@@ -1,9 +1,14 @@
-// Панель вопроса (раздел 11.2). Следующий вопрос загружается заранее; время ответа — от момента,
-// когда вопрос стал активным, до клика (паузы и ожидание цели не считаются).
+// Панель вопроса (раздел 11.2). Время ответа — от момента, когда вопрос стал активным, до клика
+// или отправки (паузы, ожидание цели и проверка ответа не считаются). Следующий вопрос
+// загружается заранее, если источник этого хочет.
+// Форматы обучающего движка: инструкция и метка темы, перевод, поле слова, аудирование
+// с повтором, свободный ответ и строка разбора, которая остаётся видна под следующим вопросом.
 
 import { balance } from '../config/balance';
 import { ru } from '../i18n/ru';
-import type { Question, QuestionProvider } from '../questions/types';
+import { playQuestionAudio, stopQuestionAudio, unlockQuestionAudio } from '../learning/audio';
+import { localRecallEvaluation } from '../learning/recall';
+import type { Question, QuestionProvider, RecallVerdict } from '../questions/types';
 import { h, promptNodes, restartAnim } from './dom';
 
 export interface PanelIcons {
@@ -17,8 +22,18 @@ export class QuestionPanel {
   readonly el: HTMLElement;
   private readonly body: HTMLElement;
   private readonly prompt: HTMLElement;
+  private readonly promptLabel: HTMLElement;
+  private readonly promptMeta: HTMLElement;
   private readonly promptText: HTMLElement;
+  private readonly wordField: HTMLElement;
+  private readonly translation: HTMLElement;
+  private readonly replay: HTMLButtonElement;
+  private readonly hint: HTMLElement;
   private readonly options: HTMLElement;
+  private readonly recallForm: HTMLFormElement;
+  private readonly recallInput: HTMLInputElement;
+  private readonly recallSubmit: HTMLButtonElement;
+  private readonly feedbackLine: HTMLElement;
   private readonly pipsEl: HTMLElement;
   private readonly pipsLabel: HTMLElement;
   private readonly hoppla: HTMLElement;
@@ -38,11 +53,13 @@ export class QuestionPanel {
   private pipKey = '';
   private icons: PanelIcons = { pipFull: '', pipEmpty: '' };
   private gen = 0;
+  private shownSerial = 0;
+  private audioKey = '';
   /** Ответ: верно ли, время, вопрос. */
   onAnswer: (correct: boolean, timeMs: number, q: Question) => void = () => {};
   canAnswer: () => boolean = () => true;
 
-  constructor(touch: boolean) {
+  constructor(private readonly touch: boolean) {
     this.pipsEl = h('span', { class: 'tz-pips-boots', 'aria-hidden': 'true' });
     this.pipsLabel = h('span', { class: 'tz-pips-label' }, ru.stepCost(1));
     const pips = h('div', { class: 'tz-pips', role: 'status' }, this.pipsEl, this.pipsLabel);
@@ -52,16 +69,75 @@ export class QuestionPanel {
       h('div', { class: 'tz-caption tz-q-title' }, 'Вопрос на шаг'),
       pips,
     );
+    this.promptLabel = h('span', { class: 'tz-prompt-label' }, ru.chooseAnswer);
+    this.promptMeta = h('span', { class: 'tz-prompt-meta', lang: 'de' });
     this.promptText = h('span', { class: 'tz-prompt-text' });
+    this.wordField = h('span', { class: 'tz-wordfield', hidden: true });
+    this.translation = h('span', { class: 'tz-translation', lang: 'ru', hidden: true });
+    this.replay = h(
+      'button',
+      {
+        class: 'tz-replay',
+        type: 'button',
+        hidden: true,
+        'aria-label': ru.replayLabel,
+        onclick: () => this.replayAudio(),
+      },
+      ru.replay,
+    );
     this.prompt = h(
       'div',
       { class: 'tz-caption tz-prompt', id: 'tz-prompt' },
-      h('span', { class: 'tz-prompt-label' }, 'Выбери верный ответ'),
+      h('span', { class: 'tz-prompt-top' }, this.promptLabel, this.promptMeta),
       this.promptText,
+      this.wordField,
+      this.translation,
+      this.replay,
     );
+    this.hint = h('div', { class: 'tz-hint', hidden: true });
     this.options = h('div', { class: 'tz-options' });
+    this.recallInput = h('input', {
+      class: 'tz-recall-input',
+      type: 'text',
+      lang: 'de',
+      autocomplete: 'off',
+      autocapitalize: 'off',
+      autocorrect: 'off',
+      spellcheck: 'false',
+      enterkeyhint: 'done',
+      'aria-label': ru.recallLabel,
+    });
+    this.recallSubmit = h(
+      'button',
+      { class: 'tz-btn is-primary tz-recall-submit', type: 'submit' },
+      ru.check,
+    );
+    this.recallForm = h(
+      'form',
+      {
+        class: 'tz-recall',
+        hidden: true,
+        onsubmit: (e: Event) => {
+          e.preventDefault();
+          void this.submitRecall();
+        },
+      },
+      this.recallInput,
+      this.recallSubmit,
+    );
+    this.recallInput.addEventListener('input', () => this.refreshRecall());
+    this.feedbackLine = h('div', { class: 'tz-feedback', hidden: true });
     const await_ = h('div', { class: 'tz-caption tz-await' }, ru.chooseTarget);
-    this.body = h('div', { class: 'tz-q-body' }, this.prompt, this.options, await_);
+    this.body = h(
+      'div',
+      { class: 'tz-q-body' },
+      this.prompt,
+      this.hint,
+      this.options,
+      this.recallForm,
+      this.feedbackLine,
+      await_,
+    );
     this.hoppla = h('div', { class: 'tz-hoppla', 'aria-hidden': 'true' }, 'HOPPLA!');
     this.live = h('div', { class: 'tz-sr', 'aria-live': 'polite' });
     const ready = h('div', { class: 'tz-ready' }, ru.getReady);
@@ -114,7 +190,7 @@ export class QuestionPanel {
     );
   }
 
-  /** Новый раунд: «Приготовься…», первый вопрос грузится заранее. */
+  /** Новый раунд: «Приготовься…», первый вопрос грузится заранее, если источник не против. */
   startRound(provider: QuestionProvider): void {
     this.el.classList.remove('is-rules');
     this.provider = provider;
@@ -122,10 +198,12 @@ export class QuestionPanel {
     this.mode = 'intro';
     this.feedback = false;
     this.current = null;
-    this.nextQ = provider.next();
+    this.nextQ = provider.prefetch === false ? null : provider.next();
+    this.setFeedback('', 'none');
     this.el.classList.add('is-intro');
     this.el.classList.remove('is-awaiting', 'is-paused');
     this.stopClock();
+    this.syncAudio();
   }
 
   /** Интро закончилось — показать первый вопрос. */
@@ -142,6 +220,9 @@ export class QuestionPanel {
     this.gen++;
     this.feedback = false;
     for (const b of this.buttons) b.disabled = true;
+    this.recallInput.disabled = true;
+    this.recallSubmit.disabled = true;
+    this.syncAudio();
   }
 
   private async showNext(flip: boolean): Promise<void> {
@@ -150,7 +231,8 @@ export class QuestionPanel {
     const q = await (this.nextQ ?? this.provider.next());
     if (myGen !== this.gen) return;
     this.current = q;
-    this.nextQ = this.provider.next();
+    this.shownSerial++;
+    this.nextQ = this.provider.prefetch === false ? null : this.provider.next();
     this.render(q);
     if (flip) restartAnim(this.body, 'tz-flip');
     this.activeMs = 0;
@@ -161,36 +243,98 @@ export class QuestionPanel {
   }
 
   private render(q: Question): void {
+    this.promptLabel.textContent = q.instruction || ru.chooseAnswer;
+    this.promptMeta.textContent = q.meta ?? '';
+    this.promptMeta.hidden = !q.meta;
     this.promptText.replaceChildren(...promptNodes(q.prompt));
     this.promptText.setAttribute('lang', q.promptLang);
-    this.buttons = q.options.map((text, i) => {
-      const b = h(
-        'button',
-        {
-          class: 'tz-opt',
-          type: 'button',
-          lang: q.optionsLang,
-          'aria-label': ru.optionLabel(i + 1, text),
-          onclick: () => this.answer(i),
-        },
-        h('span', { class: 'tz-opt-key', 'aria-hidden': 'true' }, String(i + 1)),
-        h('span', { class: 'tz-opt-text' }, text),
+    this.wordField.hidden = !q.wordField;
+    this.wordField.replaceChildren(
+      ...(q.wordField
+        ? [
+            h('span', { class: 'tz-wordfield-base' }, ru.wordField(q.wordField.base)),
+            h('em', { lang: 'de' }, q.wordField.bank.join(' · ')),
+          ]
+        : []),
+    );
+    // Аудирование не печатает ни фразу, ни перевод: вместо перевода — кнопка повтора.
+    this.translation.textContent = q.audioText ? '' : (q.translation ?? '');
+    this.translation.hidden = !!q.audioText || !q.translation;
+    this.replay.hidden = !q.audioText;
+    this.hint.textContent = q.hint ?? '';
+    this.hint.hidden = !q.hint;
+    this.el.dataset.answer = q.recall ? 'recall' : 'choice';
+
+    if (q.recall) {
+      this.buttons = [];
+      this.options.replaceChildren();
+      this.options.hidden = true;
+      this.recallForm.hidden = false;
+      this.recallInput.value = '';
+      this.recallInput.placeholder = q.recall.placeholder;
+      this.recallInput.classList.remove('is-correct', 'is-wrong');
+      this.recallSubmit.classList.remove('is-busy');
+    } else {
+      this.recallForm.hidden = true;
+      this.options.hidden = false;
+      this.buttons = q.options.map((text, i) =>
+        h(
+          'button',
+          {
+            class: 'tz-opt',
+            type: 'button',
+            lang: q.optionsLang,
+            'aria-label': ru.optionLabel(i + 1, text),
+            onclick: () => this.answer(i),
+          },
+          h('span', { class: 'tz-opt-key', 'aria-hidden': 'true' }, String(i + 1)),
+          h('span', { class: 'tz-opt-text' }, text),
+        ),
       );
-      return b;
-    });
-    this.options.replaceChildren(...this.buttons);
-    this.options.dataset.count = String(q.options.length);
+      this.options.replaceChildren(...this.buttons);
+      this.options.dataset.count = String(q.options.length);
+    }
+    // Разбор прошлого ответа остаётся под новым вопросом, приглушённым, до следующего ответа.
+    this.feedbackLine.classList.add('is-past');
+    if (!q.rule && !this.feedbackLine.textContent) this.feedbackLine.hidden = true;
+    else this.feedbackLine.hidden = false;
     this.fit();
-    this.live.textContent = q.prompt.replace(/___/g, '…');
+    this.live.textContent = q.audioText ? (q.instruction ?? '') : q.prompt.replace(/___/g, '…');
   }
 
-  /** Подогнать задание и варианты под текущий размер панели. */
+  /**
+   * Подогнать задание и варианты под текущий размер панели. Если задание с переводом, полем слова
+   * и разбором всё равно не помещается (телефон), панель переходит в плотную компоновку, а на
+   * самых маленьких экранах — в тесную: разбор всплывает поверх задания только на время ответа.
+   */
   fit(): void {
+    this.layoutOptions();
+    this.el.classList.remove('is-dense', 'is-cramped');
     this.fitPrompt();
+    for (const level of ['is-dense', 'is-cramped']) {
+      if (!this.overflowing()) break;
+      this.el.classList.add(level);
+      this.fitPrompt();
+    }
     this.fitOptions();
   }
 
-  /** Если текст не помещается в две строки, шрифт ужимается с 24 до 16 px. */
+  /** Число рядов вариантов: в портрете по два в ряд, в ландшафте — столбиком. */
+  private layoutOptions(): void {
+    const n = this.buttons.length;
+    const portrait = this.el.closest<HTMLElement>('.tz')?.dataset.orient === 'portrait';
+    this.options.style.setProperty('--opt-rows', String(portrait ? Math.ceil(n / 2) : n));
+  }
+
+  /** Панель переполнена: либо всё задание, либо ряды вариантов не влезают в оставшееся место. */
+  private overflowing(): boolean {
+    return (
+      this.body.scrollHeight > this.body.clientHeight + 1 ||
+      (!this.options.hidden && this.options.scrollHeight > this.options.clientHeight + 1)
+    );
+  }
+
+  /** Если текст не помещается в две строки или панель переполнена, шрифт ужимается с 24 до 16 px. */
   private fitPrompt(): void {
     const L = balance.layout;
     let size = L.promptFontMax;
@@ -199,7 +343,9 @@ export class QuestionPanel {
     let guard = 0;
     while (
       size > L.promptFontMin &&
-      (el.scrollWidth > el.clientWidth + 1 || this.promptText.offsetHeight > size * 2.6) &&
+      (el.scrollWidth > el.clientWidth + 1 ||
+        this.promptText.offsetHeight > size * 2.6 ||
+        this.overflowing()) &&
       guard++ < 10
     ) {
       size -= 2;
@@ -259,6 +405,46 @@ export class QuestionPanel {
     if (!live) this.stopClock();
     for (const b of this.buttons) b.disabled = !live;
     this.el.classList.toggle('is-awaiting', this.awaiting && this.mode === 'active' && !this.feedback);
+    this.refreshRecall();
+    this.syncAudio();
+  }
+
+  /**
+   * Поле свободного ответа. Во время проверки и разбора оно только для чтения, но не теряет
+   * фокус — экранная клавиатура телефона не прыгает между вопросами. Пока ждём цель или стоим
+   * на паузе, поле выключено, а стрелки и клавиши героя снова управляют игрой.
+   */
+  private refreshRecall(): void {
+    if (!this.current?.recall) return;
+    const live = this.isLive();
+    const idle = this.mode !== 'active' || this.paused || this.awaiting;
+    const focused = document.activeElement === this.recallInput;
+    this.recallInput.disabled = idle;
+    this.recallInput.readOnly = !live;
+    this.recallSubmit.disabled = !live || !this.recallInput.value.trim();
+    if (live && !this.touch && !focused) this.recallInput.focus({ preventScroll: true });
+    if (idle && focused) {
+      this.recallInput.blur();
+      this.el.closest<HTMLElement>('.tz')?.focus({ preventScroll: true });
+    }
+  }
+
+  /** Фраза аудирования звучит, когда вопрос на экране и игра не стоит; смолкает на паузе. */
+  private syncAudio(): void {
+    const q = this.current;
+    const audible = this.mode === 'active' && !this.paused && !this.awaiting && !!q?.audioText;
+    const key = audible && q ? `${q.id}#${this.shownSerial}` : '';
+    if (key === this.audioKey) return;
+    this.audioKey = key;
+    if (audible && q?.audioText) void playQuestionAudio(q.audioText);
+    else stopQuestionAudio();
+  }
+
+  private replayAudio(): void {
+    const text = this.current?.audioText;
+    if (!text || this.mode !== 'active' || this.paused) return;
+    unlockQuestionAudio();
+    void playQuestionAudio(text);
   }
 
   setPaused(p: boolean): void {
@@ -314,23 +500,74 @@ export class QuestionPanel {
     this.feedback = true;
     this.refreshActive();
     this.provider.report({ id: q.id, correct, timeMs });
-    const btn = this.buttons[i];
-    const myGen = this.gen;
-    if (correct) {
-      btn.classList.add('is-correct');
-      this.onAnswer(true, timeMs, q);
-      setTimeout(() => {
-        if (myGen === this.gen) void this.showNext(true);
-      }, balance.answers.correctFlashMs);
-    } else {
-      btn.classList.add('is-wrong');
+    if (correct) this.buttons[i].classList.add('is-correct');
+    else {
+      this.buttons[i].classList.add('is-wrong');
       this.buttons[q.correctIndex]?.classList.add('is-right');
-      restartAnim(this.hoppla, 'is-on');
-      this.live.textContent = `${q.options[q.correctIndex]}`;
-      this.onAnswer(false, timeMs, q);
-      setTimeout(() => {
-        if (myGen === this.gen) void this.showNext(true);
-      }, balance.answers.wrongFeedbackMs);
     }
+    const text = q.rule ? (correct ? q.rule : ru.wrongRule(q.rule)) : '';
+    this.conclude(q, correct, timeMs, text);
+  }
+
+  private async submitRecall(): Promise<void> {
+    const q = this.current;
+    const provider = this.provider;
+    const answer = this.recallInput.value.trim();
+    if (!q?.recall || !provider || !answer || !this.isLive()) return;
+    if (performance.now() < this.guardUntil) return;
+    if (!this.canAnswer()) return;
+    const timeMs = Math.round(this.elapsed());
+    this.stopClock();
+    this.feedback = true;
+    this.recallSubmit.classList.add('is-busy');
+    this.refreshActive();
+    const myGen = this.gen;
+    let verdict: RecallVerdict;
+    try {
+      verdict = provider.evaluate ? await provider.evaluate(q, answer) : this.localVerdict(q, answer);
+    } catch {
+      verdict = this.localVerdict(q, answer);
+    }
+    if (myGen !== this.gen || this.current !== q) return;
+    this.recallSubmit.classList.remove('is-busy');
+    if (!this.canAnswer()) {
+      // Пока шла проверка, игра встала на паузу: ответ не засчитан, его можно отправить снова.
+      this.feedback = false;
+      this.refreshActive();
+      return;
+    }
+    provider.report({ id: q.id, correct: verdict.correct, timeMs });
+    this.recallInput.classList.add(verdict.correct ? 'is-correct' : 'is-wrong');
+    this.refreshActive();
+    this.conclude(q, verdict.correct, timeMs, verdict.feedback);
+  }
+
+  private localVerdict(q: Question, answer: string): RecallVerdict {
+    const expected = q.options[q.correctIndex];
+    return localRecallEvaluation(answer, expected).correct
+      ? { correct: true, feedback: q.rule ?? '' }
+      : { correct: false, feedback: ru.recallMiss(expected) };
+  }
+
+  /** Общий хвост ответа: разбор, «HOPPLA!», событие для игры и следующий вопрос. */
+  private conclude(q: Question, correct: boolean, timeMs: number, text: string): void {
+    this.setFeedback(text, correct ? 'good' : 'bad');
+    if (!correct) restartAnim(this.hoppla, 'is-on');
+    this.live.textContent = text || (correct ? '' : q.options[q.correctIndex]);
+    this.onAnswer(correct, timeMs, q);
+    const myGen = this.gen;
+    setTimeout(
+      () => {
+        if (myGen === this.gen) void this.showNext(true);
+      },
+      correct ? balance.answers.correctFlashMs : balance.answers.wrongFeedbackMs,
+    );
+  }
+
+  private setFeedback(text: string, tone: 'good' | 'bad' | 'none'): void {
+    this.feedbackLine.textContent = text;
+    this.feedbackLine.hidden = !text && !this.current?.rule;
+    this.feedbackLine.classList.remove('is-past', 'is-good', 'is-bad');
+    if (tone !== 'none') this.feedbackLine.classList.add(tone === 'good' ? 'is-good' : 'is-bad');
   }
 }

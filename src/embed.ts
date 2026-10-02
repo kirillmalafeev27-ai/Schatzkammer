@@ -20,7 +20,8 @@ import type { QuestionProvider } from './questions/types';
 import { pickKit } from './art/kits';
 
 export interface TreasuryOptions {
-  questions: QuestionProvider;
+  /** Свой источник вопросов. Без него работает встроенный обучающий движок (как в Conveyor). */
+  questions?: QuestionProvider;
   storage?: KeyValueStorage;
   level?: number;
   onFinish?: (r: FinishResult) => void;
@@ -40,5 +41,5 @@ export function mountTreasury(container: HTMLElement, options: TreasuryOptions):
   return { destroy: () => app.destroy() };
 }
 
-export type { QuestionProvider, Question, AnswerReport } from './questions/types';
+export type { QuestionProvider, Question, AnswerReport, RecallVerdict } from './questions/types';
 export type { FinishResult };

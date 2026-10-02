@@ -45,6 +45,14 @@ export const ru = {
   getReady: 'Приготовься…',
   questionGroup: 'Вопрос: каждый верный ответ — заряд шага',
   optionLabel: (i: number, text: string) => `Вариант ${i}: ${text}`,
+  chooseAnswer: 'Выбери верный ответ',
+  replay: '▶ Повторить',
+  replayLabel: 'Прослушать немецкую фразу ещё раз',
+  recallLabel: 'Ответ на немецком',
+  check: 'Проверить',
+  wordField: (base: string) => `Wortfeld «${base}»`,
+  wrongRule: (rule: string) => `Неверно. ${rule}`,
+  recallMiss: (answer: string) => `Пока не совпало. Ответ: ${answer}`,
   pipsLabel: (have: number, need: number) => `Заряды шага: ${have} из ${need}`,
 
   bagLabel: 'Мешок',
@@ -96,7 +104,17 @@ export const ru = {
   sfxLangDe: 'Deutsch',
   sfxLangRu: 'Русский',
   keyboardHelp:
-    'Клавиши: 1–4 — ответ, стрелки — шаг, H — к выходу, Пробел — отменить цель, Q/E — выбросить, P — пауза',
+    'Клавиши: 1–4 — ответ, Enter — свободный ответ, стрелки — шаг, H — к выходу, Пробел — отменить цель, Q/E — выбросить, P — пауза',
+
+  learningTitle: 'Немецкий',
+  learningLevel: 'Немецкий',
+  learningMode: 'Режим',
+  learningLexical: 'Лексика',
+  learningGrammar: 'Грамматика',
+  learningGrammarAudio: 'Аудирование не привязано к грамматике',
+  poolChecking: 'проверка пула',
+  poolOnline: 'AI-пул активен',
+  poolReserve: 'умный резерв активен',
 
   menuHint: 'Каждый верный ответ — шаг. Золото тяжелеет. Дверь опускается.',
   rulesTitle: 'Как играть',

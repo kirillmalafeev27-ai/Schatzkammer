@@ -3,6 +3,16 @@
 import { levels, ENDLESS_LEVEL_ID } from '../../config/levels';
 import { ru } from '../../i18n/ru';
 import type { SaveData, Settings } from '../../game/storage';
+import type { PoolStatus } from '../../learning/client';
+import {
+  GRAMMAR_TOPIC_GROUPS,
+  LANGUAGE_LEVELS,
+  LEXICAL_TOPIC_GROUPS,
+  QUESTION_MODES,
+  normalizeLearningSettings,
+  type LearningSettings,
+  type TopicGroup,
+} from '../../learning/settings';
 import { h } from '../dom';
 
 export interface ScreenHost {
@@ -90,9 +100,108 @@ export function menuScreen(opts: {
   );
 }
 
+export interface LearningSetupOpts {
+  settings: LearningSettings;
+  /** Готовность сервера: пока ответа нет, показывается «проверка пула». */
+  status: Promise<PoolStatus>;
+  onChange: (s: LearningSettings) => void;
+}
+
+/**
+ * Содержимое меню Conveyor: уровень немецкого, режим, лексическая и грамматическая темы
+ * (по группам) и состояние пула — генерация на сервере или встроенный резерв.
+ */
+export function learningSetup(o: LearningSetupOpts): HTMLElement {
+  let s = { ...o.settings };
+  const status = h('span', { class: 'tz-pool-status', role: 'status' }, ru.poolChecking);
+  void o.status.then((st) => {
+    status.textContent = st.ready ? ru.poolOnline : ru.poolReserve;
+    status.classList.toggle('is-online', st.ready);
+  });
+  const options = (key: keyof LearningSettings, entries: readonly (readonly [string, string])[]) =>
+    entries.map(([value, text]) => h('option', { value, selected: value === s[key] }, text));
+  const grouped = (key: keyof LearningSettings, groups: readonly TopicGroup<string>[]) =>
+    groups.map((g) =>
+      h(
+        'optgroup',
+        { label: g.label },
+        ...options(
+          key,
+          g.topics.map((t) => [t, t] as const),
+        ),
+      ),
+    );
+  const field = (key: keyof LearningSettings, label: string, children: Node[], lang?: string) => {
+    const select = h(
+      'select',
+      {
+        class: 'tz-select',
+        lang: lang ?? null,
+        onchange: (e: Event) => {
+          s = normalizeLearningSettings({ ...s, [key]: (e.target as HTMLSelectElement).value });
+          sync();
+          o.onChange({ ...s });
+        },
+      },
+      ...children,
+    );
+    const wide = key === 'lexicalTopic' || key === 'grammarTopic';
+    return {
+      select,
+      el: h('label', { class: `tz-learn-field${wide ? ' is-wide' : ''}` }, h('span', {}, label), select),
+    };
+  };
+  const level = field(
+    'level',
+    ru.learningLevel,
+    options(
+      'level',
+      LANGUAGE_LEVELS.map((l) => [l, l] as const),
+    ),
+  );
+  const mode = field(
+    'mode',
+    ru.learningMode,
+    options(
+      'mode',
+      QUESTION_MODES.map((m) => [m.id, m.label] as const),
+    ),
+  );
+  const lexical = field(
+    'lexicalTopic',
+    ru.learningLexical,
+    grouped('lexicalTopic', LEXICAL_TOPIC_GROUPS),
+    'de',
+  );
+  const grammar = field(
+    'grammarTopic',
+    ru.learningGrammar,
+    grouped('grammarTopic', GRAMMAR_TOPIC_GROUPS),
+    'de',
+  );
+  // Аудирование не привязано к грамматической теме (у него своя очередь), поэтому выбор темы
+  // в этом режиме ничего не меняет и выключен.
+  const sync = () => {
+    grammar.select.disabled = s.mode === 'audio';
+    grammar.el.title = s.mode === 'audio' ? ru.learningGrammarAudio : '';
+  };
+  sync();
+  return h(
+    'section',
+    { class: 'tz-learn', 'aria-label': ru.learningTitle },
+    h('div', { class: 'tz-learn-head' }, h('h3', {}, ru.learningTitle), status),
+    h('div', { class: 'tz-learn-grid' }, level.el, mode.el, lexical.el, grammar.el),
+  );
+}
+
 export function levelsScreen(
   save: SaveData,
-  opts: { onPick: (id: number) => void; onBack: () => void; doorIcon?: string },
+  opts: {
+    onPick: (id: number) => void;
+    onBack: () => void;
+    doorIcon?: string;
+    learning?: LearningSetupOpts;
+  },
 ): HTMLElement {
   const cards = levels.map((l) => {
     const unlocked = save.isUnlocked(l.id);
@@ -128,6 +237,7 @@ export function levelsScreen(
       'div',
       { class: 'tz-card', style: 'max-width:720px' },
       h('div', { class: 'tz-caption tz-card-tag' }, ru.levels),
+      opts.learning ? learningSetup(opts.learning) : null,
       h('div', { class: 'tz-levels' }, ...cards),
       h(
         'div',

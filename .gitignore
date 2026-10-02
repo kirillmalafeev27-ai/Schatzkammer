@@ -1,6 +1,9 @@
 node_modules
 dist
+dist-server
 shots
 *.log
 .DS_Store
 .vite
+.env
+.env.local
