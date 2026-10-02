@@ -15,11 +15,11 @@ npm run dev                  # http://localhost:5173, API движка подк�
 Рабочий режим — один Node-процесс отдаёт и игру, и API:
 
 ```bash
-npm run build      # клиент в dist/, сервер в dist-server/
-npm start          # http://0.0.0.0:3000 (PORT, HOST — переменные окружения)
+npm run build      # проверка типов, затем всё нужное для запуска — в dist/standalone/
+npm start          # игра и API на 0.0.0.0, порты 8080 и 3000 (свой номер — PORT или PORTS)
 ```
 
-Ключи читаются из окружения, `.env.local` и `.env` и в браузер не попадают. Все переменные — в [`.env.example`](.env.example).
+Ключи читаются из окружения, `.env.local` и `.env` и в браузер не попадают. Все переменные — в [`.env.example`](.env.example). Выкладка на Northflank — ниже, в разделе [Northflank](#northflank).
 
 Параметры адреса:
 
@@ -81,13 +81,52 @@ npm start          # http://0.0.0.0:3000 (PORT, HOST — переменные о
 ```bash
 npm test           # правила, поиск пути, генератор, планировщик, темп, банк вопросов, обучающий движок и API
 npm run lint
-npm run build      # проверка типов + сборка в dist/
+npm run build      # проверка типов + сборка: игра в dist/, сервер с игрой в dist/standalone/
+npm run build:node # то же без проверки типов — так собирает Dockerfile
+npm start          # сервер с игрой и API (собирает dist/standalone, если её ещё нет)
 npm run sim        # боты проходят все залы, отчёт по стратегиям
 npm run sim -- --level 3 --runs 2000 --tmed 5000 --p 0.8
 npm run sim -- --level 5 --override '{"obstacles":6}'   # проба варианта уровня
 npm run shots      # скриншоты Playwright (нужен запущенный npm run dev)
 npm run shots -- --sizes 390x844,1280x720 --scenario round --out shots
 ```
+
+## Northflank
+
+Деплой устроен так же, как в Conveyor: те же скрипты, тот же `Dockerfile`, тот же выбор портов.
+
+### Пошагово
+
+1. Код должен лежать на GitHub (в Windows это делает `push-to-github.cmd` — двойной щелчок, он отправит проект в ветку `main`).
+2. В Northflank: **Create new → Service → Combined service**.
+3. Репозиторий — `kirillmalafeev27-ai/Schatzkammer`, ветка — та, где лежит этот код.
+4. **Build**: тип сборки `Dockerfile`, путь `/Dockerfile`, контекст `/`.
+5. **Networking / Ports**: добавьте порт `8080`, протокол HTTP, публичный доступ включён. Номер `3000` тоже сработает.
+6. **Environment**: секрет `AITUNNEL_API_KEY` (без него игра работает на встроенном резерве). Для озвучки аудирования — `ELEVENLABS_API_KEY` (необязательно, без него читает голос браузера). Остальные необязательные переменные — в [`.env.example`](.env.example).
+7. **Health checks**: readiness и liveness — HTTP `GET /healthz` на том же порту.
+8. **Resources**: одна реплика — кэш пакетов живёт в памяти.
+9. Run command оставьте пустым. Создайте сервис, дождитесь сборки и откройте публичный адрес. В логах при старте должна быть строка `[northflank] PORT= PORTS= -> binding 8080, 3000 on 0.0.0.0`.
+
+### Что внутри
+
+- `Dockerfile` собирает игру командой `npm run build:node` и кладёт в образ только `dist/standalone/` — сервер (`server.js`, без `node_modules`), игру (`public/`) и запускающий скрипт `northflank-serve.mjs`; работает от пользователя `node`, `.env`-файлов в образе нет.
+- Northflank **не** подставляет `$PORT`, поэтому без `PORT`/`PORTS` контейнер слушает сразу `8080` и `3000`, и любой из этих номеров в port entry доходит до игры. Для другого номера задайте `PORT` (или `PORTS` через запятую) в переменных сервиса.
+- run command можно не задавать (`node northflank-serve.mjs` из `CMD`); `npm start` и `npm run start:northflank` ведут туда же.
+
+Если сервис собирается из репозитория, а не из `Dockerfile` (buildpack/Git-сборка):
+
+- build command: `npm ci --no-audit --no-fund && npm run build:node`;
+- run command: `npm run start:northflank` — или оставьте пустым: `npm start` ведёт в тот же скрипт.
+
+`npm run start:northflank` подставляет `NODE_ENV=production` и `HOST=0.0.0.0`, разбирает `PORT`/`PORTS`, пишет в лог итоговый список портов и сам собирает `dist/standalone`, если сборка прошла без `build:node`.
+
+### Ingress отвечает `Connection refused`
+
+`upstream connect error ... Connection refused` приходит от прокси Northflank, а не от игры: контейнер поднялся, но на порту, куда постучался прокси, никто не слушает. По порядку:
+
+1. Сервис собирается из ветки, где есть корневой `Dockerfile` и `scripts/start-northflank.mjs`? Без них buildpack запустит старый `npm start`, и до ingress он не дойдёт.
+2. Номер в port entry совпадает с тем, что в логе старта: `[northflank] PORT=... PORTS=... -> binding ... on 0.0.0.0`.
+3. Если номер нестандартный — задайте `PORT` или `PORTS` в переменных сервиса и передеплойте.
 
 ## Встраивание
 
@@ -137,6 +176,7 @@ src/audio/      синтезатор на WebAudio: эффекты, пещерн
 src/questions/  интерфейс вопросов и локальный банк
 src/learning/   обучающий движок Conveyor: темы, форматы, резерв, пул, проверка ответа, озвучка
 server/         API движка: генерация, проверка ответа, озвучка; Vite-плагин и рабочий сервер
+scripts/        сборка и запуск для Northflank: build-node, start-northflank, northflank-serve
 tools/          sim.ts (симуляция ботами), shots.ts (скриншоты)
 ```
 

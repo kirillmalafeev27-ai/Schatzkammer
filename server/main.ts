@@ -1,8 +1,9 @@
-// Рабочий сервер: отдаёт собранную игру из dist/ и API обучающего движка.
-// Сборка: npm run build (клиент в dist/, сервер в dist-server/), запуск: npm start.
-// PORT (по умолчанию 3000) и HOST (по умолчанию 0.0.0.0) задаются переменными окружения.
+// Рабочий сервер: отдаёт собранную игру и API обучающего движка.
+// Сборка: npm run build:node → dist/standalone/ (server.js, игра в public/, запускающий скрипт
+// для Northflank). Запуск: npm start. PORT (по умолчанию 3000) и HOST (по умолчанию 0.0.0.0) —
+// переменные окружения; на Northflank порт выбирает scripts/northflank-serve.mjs.
 
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,7 +13,15 @@ import { isApiPath, sendWebResponse, toWebRequest } from './node.ts';
 
 loadEnvFiles(process.cwd());
 
-const staticRoot = resolve(process.env.STATIC_DIR ?? fileURLToPath(new URL('../dist/', import.meta.url)));
+// Собранный сервер лежит рядом с игрой (public/); запущенный из исходников — берёт dist/.
+function defaultStaticRoot(): string {
+  const sibling = fileURLToPath(new URL('./public/', import.meta.url));
+  return existsSync(join(sibling, 'index.html'))
+    ? sibling
+    : fileURLToPath(new URL('../dist/', import.meta.url));
+}
+
+const staticRoot = resolve(process.env.STATIC_DIR ?? defaultStaticRoot());
 const port = Number(process.env.PORT) || 3000;
 const host = process.env.HOST || '0.0.0.0';
 const api = createApiHandler();

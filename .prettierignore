@@ -1,5 +1,4 @@
 dist
-dist-server
 node_modules
 shots
 package-lock.json
