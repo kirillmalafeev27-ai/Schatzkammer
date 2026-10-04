@@ -1,6 +1,7 @@
 // Пул вопросов — правила Conveyor (use-question-pool) без React:
 // - своя очередь на каждый ключ `уровень | лексика | грамматика` (аудирование — `audio | уровень | лексика`);
-// - пакет из 8 заданий запрашивается, когда в очереди меньше 3; не вышло — повтор через 12 с;
+// - пакет из 8 заданий запрашивается, когда в очереди меньше 3; не вышло — повтор через 12 с,
+//   и каждая следующая неудача ждёт вдвое дольше, до двух минут (первый успех сбрасывает паузу);
 // - последние 80 формулировок помнятся, последние 60 уходят серверу в `exclude`;
 // - вопрос с ошибкой возвращается в хвост очереди, но не показывается два раза подряд;
 // - пока очередь пуста, без ожидания берётся встроенный резерв: сначала задания своей темы.
@@ -22,6 +23,9 @@ export const POOL_RULES = {
   recentLimit: 80,
   serverExcludeLimit: 60,
   retryDelayMs: 12_000,
+  // Недоступный, ограниченный или исчерпанный провайдер отвечает так же быстро, как здоровый,
+  // и ровный повтор превращает сбой в капель платных попыток.
+  retryDelayCeilingMs: 120_000,
   requestTimeoutMs: 46_000,
 } as const;
 
@@ -82,6 +86,7 @@ export class QuestionPool {
   private inFlight: Promise<void> | null = null;
   private abort: AbortController | null = null;
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryDelay: number = POOL_RULES.retryDelayMs;
   private epoch = 0;
   private destroyed = false;
   /** Номер текущего вопроса в раунде (с 1). */
@@ -186,6 +191,8 @@ export class QuestionPool {
           known.add(fingerprint);
           accepted.push(normalized);
         }
+        if (!accepted.length) return;
+        this.retryDelay = POOL_RULES.retryDelayMs;
         state.queue.push(...shuffled(accepted, this.random));
       })
       .catch(() => {})
@@ -195,10 +202,12 @@ export class QuestionPool {
         if (epoch === this.epoch) this.inFlight = null;
         if (!isCurrent()) return;
         if (this.enabled && state.queue.length < POOL_RULES.lowWaterMark && !this.retryTimer) {
+          const delay = this.retryDelay;
+          this.retryDelay = Math.min(delay * 2, POOL_RULES.retryDelayCeilingMs);
           this.retryTimer = setTimeout(() => {
             this.retryTimer = null;
             void this.refill();
-          }, POOL_RULES.retryDelayMs);
+          }, delay);
         }
       });
     this.inFlight = task;
@@ -230,7 +239,9 @@ export class QuestionPool {
       state.recentFingerprints.splice(0, state.recentFingerprints.length - POOL_RULES.recentLimit);
     }
     this.questionNumber = restart ? 1 : this.questionNumber + 1;
-    if (state.queue.length < POOL_RULES.lowWaterMark) void this.refill();
+    // Пока ждёт повтор после неудачи, показ вопроса его не обгоняет: иначе каждый ответ игрока
+    // был бы новой попыткой и растущая пауза ничего бы не сдерживала.
+    if (state.queue.length < POOL_RULES.lowWaterMark && !this.retryTimer) void this.refill();
     return shuffleQuestion(next, this.random);
   }
 

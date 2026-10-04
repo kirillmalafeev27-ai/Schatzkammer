@@ -119,6 +119,32 @@ describe('пул вопросов (правила Conveyor)', () => {
     expect(calls).toHaveLength(2);
   });
 
+  it('каждая неудача подряд ждёт вдвое дольше, до двух минут; первый успех сбрасывает паузу', async () => {
+    const { calls, generate } = controlledGenerate();
+    const pool = new QuestionPool(settings, generate);
+    pool.setEnabled(true);
+    const waitFor = async (delay: number) => {
+      const before = calls.length;
+      await vi.advanceTimersByTimeAsync(delay - 100);
+      expect(calls).toHaveLength(before);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(calls).toHaveLength(before + 1);
+    };
+    for (const delay of [12_000, 24_000, 48_000, 96_000, 120_000, 120_000]) {
+      calls[calls.length - 1].resolve([]);
+      await flush();
+      // Игрок отвечает дальше на резерве — повтор от этого не приходит раньше.
+      for (let i = 0; i < 3; i++) expect(pool.next().id.startsWith('reserve-')).toBe(true);
+      await waitFor(delay);
+    }
+    // Пришло мало, но пришло: следующий недобор снова ждёт 12 секунд.
+    calls[calls.length - 1].resolve(batch(2));
+    await flush();
+    expect(pool.queued).toBe(2);
+    await waitFor(POOL_RULES.retryDelayMs);
+    pool.destroy();
+  });
+
   it('вопрос с ошибкой возвращается в хвост и не повторяется сразу', async () => {
     const { calls, generate } = controlledGenerate();
     const pool = new QuestionPool(settings, generate);

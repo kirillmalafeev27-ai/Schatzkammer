@@ -127,8 +127,8 @@ describe('генерация пакетов (сервер: форматы happy-
     expect(prompt).toMatch(/NIVEAU A2/u);
     expect(prompt).toMatch(/SUBSTANZ DER OPTIONEN/u);
     expect(prompt).toMatch(/FORMAT "mehrfachluecke"/u);
-    // Пакет просят с запасом на отбраковку.
-    expect(prompt).toMatch(/Erstelle genau 8 /u);
+    // Модель просят минимум о десяти (порог See Escape) и ещё о запасе на отбраковку.
+    expect(prompt).toMatch(/Erstelle genau 14 /u);
     expect(prompt).toMatch(/- x/u);
     // Причины брака видны в логе.
     expect(String(warn.mock.calls[0]?.[0])).toMatch(/\[Dativ A2\] 4\/12 .*Füllwort-Optionen/u);
@@ -222,16 +222,49 @@ describe('генерация пакетов (сервер: форматы happy-
     expect(sentTask().exerciseFormat).toBe('audio');
   });
 
-  it('готовый пакет кэшируется; неудача ставит паузу на повтор', async () => {
+  it('остатки пакета лежат в пуле комбинации: пополнение из пула идёт без модели и без повторов', async () => {
     const gen = await load();
-    replies.push([gap(1), gap(2), gap(3), gap(4)]);
+    replies.push(Array.from({ length: 10 }, (_, i) => gap(i + 1)));
     const spec = { ...base, grammarTopic: 'Dativ' };
-    expect(await gen.generateQuestions(spec)).toHaveLength(4);
-    expect(await gen.generateQuestions(spec)).toHaveLength(4);
+    const first = await gen.generateQuestions(spec);
+    expect(first).toHaveLength(4);
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
+    // Список exclude растёт с каждым пополнением, но пул от него не зависит.
+    const second = await gen.generateQuestions({ ...spec, exclude: first.map((q) => q.context) });
+    expect(second).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const contexts = [...first, ...second].map((q) => q.context);
+    expect(new Set(contexts).size).toBe(8);
+
+    // Другая комбинация пул не делит.
+    replies.push(Array.from({ length: 10 }, (_, i) => gap(i + 21)));
+    expect(await gen.generateQuestions({ ...spec, grammarTopic: 'Akkusativ' })).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // В пуле Dativ осталось два — меньше запроса, поэтому снова модель; остаток пула не теряется.
+    replies.push(Array.from({ length: 10 }, (_, i) => gap(i + 41)));
+    expect(await gen.generateQuestions(spec)).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(await gen.generateQuestions(spec)).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('короткий пакет отдаётся; пустой ставит паузу на повтор', async () => {
+    const gen = await load();
+    // Первая попытка дала три из четырёх, повтор без response_format — ничего.
+    replies.push([gap(1), gap(2), gap(3)], []);
+    const spec = { ...base, grammarTopic: 'Dativ' };
+    expect(await gen.generateQuestions(spec)).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+
+    // Набрали столько, сколько просил клиент, — второй платной попытки нет.
+    replies.push([gap(11), gap(12), gap(13), gap(14), gap(15)]);
+    expect(await gen.generateQuestions({ ...spec, grammarTopic: 'Akkusativ' })).toHaveLength(4);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
     fetchMock.mockImplementation(async () => new Response('boom', { status: 500 }));
-    const other = { ...spec, grammarTopic: 'Akkusativ' };
+    const other = { ...spec, grammarTopic: 'Genitiv' };
     expect(await gen.generateQuestions(other)).toEqual([]);
     const calls = fetchMock.mock.calls.length;
     expect(await gen.generateQuestions(other)).toEqual([]);

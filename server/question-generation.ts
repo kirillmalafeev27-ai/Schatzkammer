@@ -1,7 +1,8 @@
 // Генерация пакетов заданий через AITunnel (или любой OpenAI-совместимый API). Грамматические
 // задания собираются по системе Druckmaschine (ветка happy-shannon): девять форматов, свод правил
 // по темам, правило субстанции, проверка ответа модели в `server/exercises/`. Синонимы,
-// аудирование, кэш пакетов и пауза после неудачи — как в Conveyor. Ключ живёт только на сервере.
+// аудирование и пауза после неудачи — как в Conveyor; пул остатков — как в See Escape.
+// Ключ живёт только на сервере.
 
 import {
   DEFAULT_LEARNING_SETTINGS,
@@ -44,7 +45,13 @@ const LEXICAL_TOPIC_SET = new Set<string>(LEXICAL_TOPICS);
 const GRAMMAR_TOPIC_SET = new Set<string>(GRAMMAR_TOPICS);
 const MODES = new Set<string>(QUESTION_MODES.map((entry) => entry.id));
 const MAX_RESPONSE_CHARACTERS = 1_500_000;
-const cache = new Map<string, { expiresAt: number; questions: GameQuestion[] }>();
+// Остатки пакетов на каждую учебную комбинацию — в той форме, что давно работает в See Escape.
+// Прежний ключ кэша включал список exclude игрока, а он меняется с каждым пополнением: кэш не
+// срабатывал никогда, и каждое пополнение оплачивалось заново. Отданные вопросы изымаются из
+// пула, поэтому один вопрос не уходит дважды и фильтровать пул не нужно.
+const questionPool = new Map<string, GameQuestion[]>();
+// Излишек остаётся, только если просить больше, чем нужно пополнению; десять — порог See Escape.
+const GENERATION_FLOOR = 10;
 const pending = new Map<string, Promise<GameQuestion[]>>();
 const failureUntil = new Map<string, number>();
 let activeRequests = 0;
@@ -184,8 +191,10 @@ function configuration() {
     baseUrl,
     models,
     timeoutMs: boundedInteger(environment.QUESTION_GENERATION_TIMEOUT_MS, 45_000, 3_000, 90_000),
-    cacheTtlMs: boundedInteger(environment.QUESTION_CACHE_TTL_MS, 30 * 60_000, 30_000, 24 * 60 * 60_000),
+    // Сколько учебных комбинаций держит пул; дольше всех не игравшая уходит первой.
     cacheLimit: boundedInteger(environment.QUESTION_CACHE_LIMIT, 96, 8, 256),
+    // Сколько остатков держит одна комбинация, прежде чем старейшие отбрасываются.
+    poolLimit: boundedInteger(environment.QUESTION_POOL_LIMIT, 60, 10, 400),
     failureCooldownMs: boundedInteger(environment.QUESTION_FAILURE_COOLDOWN_MS, 15_000, 1_000, 120_000),
     concurrency: boundedInteger(environment.QUESTION_GENERATION_CONCURRENCY, 4, 1, 12),
   };
@@ -556,15 +565,34 @@ function parseResponse(raw: string, spec: QuestionSpec) {
   return questions;
 }
 
-function cacheKey(spec: QuestionSpec) {
-  return JSON.stringify({
-    level: spec.level,
-    mode: spec.mode,
-    lexicalTopic: spec.lexicalTopic,
-    grammarTopic: spec.grammarTopic,
-    count: spec.count,
-    exclude: [...spec.exclude].sort(),
-  });
+function poolKey(spec: QuestionSpec) {
+  // Аудирование не привязано к грамматической теме, а узнавание и воспроизведение нарочно
+  // делят одну очередь на клиенте (learningPoolKey) — ни то ни другое пул не дробит.
+  return spec.mode === 'audio'
+    ? `audio:${spec.level}:${spec.lexicalTopic}`
+    : `${spec.level}:${spec.grammarTopic}:${spec.lexicalTopic}`;
+}
+
+function addToPool(
+  key: string,
+  questions: GameQuestion[],
+  limits: { cacheLimit: number; poolLimit: number },
+) {
+  if (!questions.length) return;
+  const pooled = questionPool.get(key) ?? [];
+  const seen = new Set(pooled.map(questionFingerprint));
+  for (const question of questions) {
+    const fingerprint = questionFingerprint(question);
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
+    pooled.push(question);
+  }
+  if (pooled.length > limits.poolLimit) pooled.splice(0, pooled.length - limits.poolLimit);
+  // Повторная вставка переносит ключ в конец, поэтому при переполнении уходит комбинация,
+  // в которую дольше всех не играли.
+  questionPool.delete(key);
+  questionPool.set(key, pooled);
+  while (questionPool.size > limits.cacheLimit) questionPool.delete(questionPool.keys().next().value!);
 }
 
 function cloneQuestions(questions: GameQuestion[]) {
@@ -646,7 +674,12 @@ async function requestBatch(
   }
 }
 
-async function generateFresh(spec: QuestionSpec) {
+/**
+ * Модель просят о `spec.count` заданиях, а повторная попытка (другой режим ответа или другая
+ * модель) идёт, только пока не набрано `enough` — столько, сколько просил клиент: каждая
+ * попытка оплачивается. Всё набранное возвращается, даже если его меньше.
+ */
+async function generateFresh(spec: QuestionSpec, enough: number) {
   const config = configuration();
   const deadline = Date.now() + config.timeoutMs;
   const collected: GameQuestion[] = [];
@@ -669,47 +702,48 @@ async function generateFresh(spec: QuestionSpec) {
           seen.add(fingerprint);
           collected.push(question);
         }
-        if (collected.length >= spec.count) return collected.slice(0, spec.count);
+        if (collected.length >= enough) return collected;
       } catch {
         // Повтор или другая модель ещё может вернуть годный пакет.
       }
     }
   }
-  return collected.slice(0, spec.count);
+  // Короткий пакет не выбрасывается: он оплачен, а недостающее доберёт следующее пополнение.
+  return collected;
 }
 
 export async function generateQuestions(input: unknown) {
   const spec = normalizeRequest(input);
   const config = configuration();
   if (!isQuestionGenerationReady()) return [];
-  const key = cacheKey(spec);
+  const key = poolKey(spec);
   const now = Date.now();
   pruneFailureCooldowns(now, Math.max(64, config.cacheLimit * 2));
-  const cached = cache.get(key);
-  if (cached && cached.expiresAt > now) return cloneQuestions(cached.questions);
-  if (cached) cache.delete(key);
+
+  // Пополнение, которое пул закрывает целиком, ничего не стоит, а изъятие вопросов из пула —
+  // то, что не даёт отдать их этому игроку второй раз.
+  const pooled = questionPool.get(key);
+  if (pooled && pooled.length >= spec.count) return cloneQuestions(pooled.splice(0, spec.count));
   if ((failureUntil.get(key) ?? 0) > now) return [];
   if (pending.has(key)) return cloneQuestions(await pending.get(key)!);
   if (activeRequests >= config.concurrency) return [];
 
+  const limits = { cacheLimit: config.cacheLimit, poolLimit: config.poolLimit };
   activeRequests += 1;
-  const task = generateFresh(spec)
+  const task = generateFresh({ ...spec, count: Math.max(spec.count, GENERATION_FLOOR) }, spec.count)
     .then((questions) => {
-      if (questions.length === spec.count) {
-        cache.set(key, {
-          expiresAt: Date.now() + config.cacheTtlMs,
-          questions: cloneQuestions(questions),
-        });
-        failureUntil.delete(key);
-        while (cache.size > config.cacheLimit) cache.delete(cache.keys().next().value!);
-        return questions;
+      if (!questions.length) {
+        failureUntil.set(key, Date.now() + config.failureCooldownMs);
+        return [];
       }
-      failureUntil.set(key, Date.now() + config.failureCooldownMs);
-      return [];
+      failureUntil.delete(key);
+      // Всё, что модель вернула сверх запроса, ждёт следующего пополнения, а не отрезается.
+      addToPool(key, questions.slice(spec.count), limits);
+      return questions.slice(0, spec.count);
     })
     .catch(() => {
       failureUntil.set(key, Date.now() + config.failureCooldownMs);
-      return [];
+      return [] as GameQuestion[];
     })
     .finally(() => {
       activeRequests = Math.max(0, activeRequests - 1);
