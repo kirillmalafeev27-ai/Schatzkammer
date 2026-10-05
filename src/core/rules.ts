@@ -46,9 +46,13 @@ export function countKind(bag: readonly number[], kind: ItemKind): number {
   return n;
 }
 
-/** D = doorAnswers × T_med, но не меньше 60 и не больше 150 секунд. */
+/**
+ * D = timeScale × doorAnswers × T_med в пределах timeScale × 60…150 секунд (timeScale = 2:
+ * 120…300 с). Множитель не трогает бюджет генератора — зал тот же, времени на него больше.
+ */
 export function doorDurationMs(doorAnswers: number, tMedMs: number): number {
-  return Math.min(balance.door.maxMs, Math.max(balance.door.minMs, doorAnswers * tMedMs));
+  const { minMs, maxMs, timeScale } = balance.door;
+  return timeScale * Math.min(maxMs, Math.max(minMs, doorAnswers * tMedMs));
 }
 
 export type Stars = 0 | 1 | 2 | 3;

@@ -4,7 +4,7 @@ export type TrailMode = 'risk' | 'steps' | 'none';
 
 export interface LevelConfig {
   id: number;
-  /** Длительность двери в «ответах»: D = doorAnswers × T_med. */
+  /** Длительность двери в «ответах»: D = timeScale × doorAnswers × T_med (balance.door.timeScale). */
   doorAnswers: number;
   coins: number;
   gems: number;

@@ -21,6 +21,12 @@ export const balance = {
   door: {
     minMs: 60_000,
     maxMs: 150_000,
+    /**
+     * Множитель всего хода двери вместе с пределами: D = timeScale × doorAnswers × T_med в
+     * пределах timeScale × 60…150 с. Расстановку зала (бюджет B) он не меняет — времени просто
+     * вдвое больше.
+     */
+    timeScale: 2,
     /** Механизм щёлкает каждые 10% хода. */
     notchFrac: 0.1,
     countdownFrom: 10,

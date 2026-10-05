@@ -19,10 +19,10 @@ describe('ценность', () => {
 });
 
 describe('дверь (2.4.1)', () => {
-  it('D = doorAnswers × T_med в пределах 60–150 с', () => {
-    expect(doorDurationMs(24, 5000)).toBe(120_000);
-    expect(doorDurationMs(24, 1000)).toBe(60_000);
-    expect(doorDurationMs(24, 10_000)).toBe(150_000);
+  it('D = 2 × doorAnswers × T_med в пределах 120–300 с: времени на дверь вдвое больше', () => {
+    expect(doorDurationMs(24, 5000)).toBe(240_000);
+    expect(doorDurationMs(24, 1000)).toBe(120_000);
+    expect(doorDurationMs(24, 10_000)).toBe(300_000);
   });
 });
 
