@@ -1,7 +1,7 @@
 // Порт test/exercise-rules.test.js из Druckmaschine (ветка happy-shannon): полнота правил,
 // разрешимость тем меню, примеры каталога, отбраковка примитивных заданий и сохранность
-// законных однословных. Плюс проверки «Сокровищницы»: резерв проходит ту же проверку, что
-// и ответ модели.
+// законных однословных. Задания генерирует теперь quiz-generation.cjs «Шахты», а эта проверка
+// стережёт встроенный резерв: каждое резервное задание проходит её целиком.
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'vitest';
@@ -12,7 +12,6 @@ import {
   renderTopicBlock,
   resolveTopic,
 } from '../server/exercises/grammar-rules';
-import { buildExercisePrompt } from '../server/exercises/exercise-prompt';
 import { buildMixRule } from '../server/exercises/quality-rules';
 import { minOptionWords, validateBatch, validateQuestion } from '../server/exercises/exercise-validation';
 import { TASK_FORMATS, TASK_FORMAT_IDS, renderFormatCatalogue } from '../src/learning/task-formats';
@@ -294,28 +293,7 @@ describe('проверка заданий (порт happy-shannon)', () => {
   });
 });
 
-describe('запрос к модели (порт happy-shannon)', () => {
-  it('запрос несёт тему, уровень, форматы и запреты', () => {
-    const prompt = buildExercisePrompt({
-      level: 'B1',
-      grammarTopic: 'Infinitiv mit zu',
-      lexicalTopic: 'Reisen & Tourismus',
-      count: 12,
-      exclude: ['Выбери грамматически правильный вариант. Sein Zug fährt um sechs.'],
-    });
-    assert.match(prompt, /GRAMMATIKTHEMA: Infinitiv mit zu/);
-    assert.match(prompt, /NIVEAU B1/);
-    assert.match(prompt, /Reisen & Tourismus/);
-    assert.match(prompt, /SUBSTANZ DER OPTIONEN/);
-    assert.match(prompt, /DECKUNGSTEST/);
-    assert.match(prompt, /SELBSTPRÜFUNG/);
-    assert.match(prompt, /FORMAT "satzvarianten"/);
-    assert.ok(!/FORMAT "luecke"/.test(prompt), 'the gap format must not be offered here');
-    assert.match(prompt, /Erstelle genau 12/);
-    assert.match(prompt, /- Sein Zug fährt um sechs\./, 'history is listed without its Russian instruction');
-    assert.match(prompt, /"translation"/);
-  });
-
+describe('свод правил: блок темы и смешивание форматов (порт happy-shannon)', () => {
   it('блок темы содержит все четыре раздела', () => {
     const block = renderTopicBlock('Praeteritum');
     assert.match(block, /GRAMMATIK "Präteritum"/);

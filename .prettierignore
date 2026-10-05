@@ -2,3 +2,5 @@ dist
 node_modules
 shots
 package-lock.json
+# Генератор See Escape и «Шахты» — копия байт в байт, правится только там.
+quiz-generation.cjs

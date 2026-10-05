@@ -7,7 +7,7 @@
 //   dist/standalone/package.json         npm start и npm run start:northflank ведут в него же
 
 import { spawnSync } from 'node:child_process';
-import { copyFileSync, cpSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
+import { copyFileSync, cpSync, readdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const projectRoot = fileURLToPath(new URL('../', import.meta.url));
@@ -48,10 +48,10 @@ export function buildStandalone() {
   // Клиент первым: его сборка очищает dist/, сервер собирается уже внутрь dist/standalone.
   const client = vite(['build']);
   if (client !== 0) return client;
+  // Входной файл называется server.js, как у standalone Conveyor (vite.config.ts): генератор
+  // заданий лежит отдельным куском и импортирует его по имени, поэтому переименовывать нельзя.
   const server = vite(['build', '--ssr', 'server/main.ts', '--outDir', 'dist/standalone', '--emptyOutDir']);
   if (server !== 0) return server;
-  // Vite называет файл по входной точке: main.js → server.js, как у standalone Conveyor.
-  renameSync(`${standalone}main.js`, `${standalone}server.js`);
   addStandaloneFiles();
   return 0;
 }

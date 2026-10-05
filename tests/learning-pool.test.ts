@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { POOL_RULES, QuestionPool, type GenerateRequest } from '../src/learning/pool';
+import {
+  POOL_RULES,
+  POOL_STORAGE_KEY,
+  QuestionPool,
+  type GenerateRequest,
+  type PoolStorage,
+} from '../src/learning/pool';
 import { questionFingerprint, questionHistoryLabel, type GameQuestion } from '../src/learning/questions';
 import type { LearningSettings } from '../src/learning/settings';
 
@@ -44,13 +50,29 @@ function controlledGenerate() {
 const isGenerated = (q: GameQuestion) => q.id.startsWith('question-');
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
-describe('пул вопросов (правила Conveyor)', () => {
+function memoryStorage(): PoolStorage & { data: Map<string, string> } {
+  const data = new Map<string, string>();
+  return {
+    data,
+    getItem: (key) => data.get(key) ?? null,
+    setItem: (key, value) => void data.set(key, value),
+  };
+}
+
+/** Пул без localStorage — для проверок, которым снимок не нужен. */
+const poolOf = (
+  generate: ReturnType<typeof controlledGenerate>['generate'],
+  s = settings,
+  random = Math.random,
+) => new QuestionPool(s, generate, random, null);
+
+describe('пул вопросов (правила «Шахты»)', () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
   it('выключенный пул не ходит на сервер и сразу отдаёт резерв своей темы', () => {
     const { generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate, () => 0.3);
+    const pool = poolOf(generate, settings, () => 0.3);
     const first = pool.next(true);
     expect(generate).not.toHaveBeenCalled();
     expect(first.id.startsWith('reserve-')).toBe(true);
@@ -58,32 +80,32 @@ describe('пул вопросов (правила Conveyor)', () => {
     expect(pool.questionNumber).toBe(1);
   });
 
-  it('пакет из 8 заданий запрашивается, когда в очереди меньше 3; один запрос на всех', async () => {
+  it('пакет из 10 заданий запрашивается, когда в очереди меньше 3; один запрос на всех', async () => {
     const { calls, generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate);
+    const pool = poolOf(generate);
     pool.setEnabled(true);
     void pool.refill();
     void pool.refill();
     expect(calls).toHaveLength(1);
-    expect(calls[0].request).toMatchObject({ ...settings, count: 8, exclude: [] });
+    expect(calls[0].request).toMatchObject({ ...settings, count: 10, exclude: [] });
 
     calls[0].resolve(batch());
     await flush();
-    expect(pool.queued).toBe(8);
+    expect(pool.queued).toBe(10);
 
     // Очередь тратится; пока в ней 3 и больше, новых запросов нет.
-    for (let i = 0; i < 5; i++) expect(isGenerated(pool.next())).toBe(true);
+    for (let i = 0; i < 7; i++) expect(isGenerated(pool.next())).toBe(true);
     expect(calls).toHaveLength(1);
     pool.next();
     expect(pool.queued).toBe(2);
     expect(calls).toHaveLength(2);
-    expect(calls[1].request.exclude).toHaveLength(6);
+    expect(calls[1].request.exclude).toHaveLength(8);
   });
 
   it('варианты перемешиваются, верный ответ сохраняется', async () => {
     const { calls, generate } = controlledGenerate();
     let r = 0;
-    const pool = new QuestionPool(settings, generate, () => [0.9, 0.1, 0.6, 0.3][r++ % 4]);
+    const pool = poolOf(generate, settings, () => [0.9, 0.1, 0.6, 0.3][r++ % 4]);
     pool.setEnabled(true);
     calls[0].resolve(batch());
     await flush();
@@ -93,61 +115,55 @@ describe('пул вопросов (правила Conveyor)', () => {
     }
   });
 
-  it('в exclude уходят последние 60 формулировок из 80 запомненных', async () => {
+  it('в exclude уходят последние 12 формулировок', async () => {
     const { calls, generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate);
+    const pool = poolOf(generate);
     const shown: string[] = [];
     for (let i = 0; i < 90; i++) shown.push(questionHistoryLabel(pool.next()));
     pool.setEnabled(true);
     expect(calls).toHaveLength(1);
-    expect(calls[0].request.exclude).toEqual(shown.slice(-80).slice(-60));
+    expect(calls[0].request.exclude).toEqual(shown.slice(-12));
   });
 
-  it('пустой ответ — повтор через 12 секунд, не раньше', async () => {
+  it('после неудачи — пауза 15 с, каждая следующая подряд вдвое дольше, до двух минут; успех сбрасывает', async () => {
     const { calls, generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate);
+    const pool = poolOf(generate);
     pool.setEnabled(true);
-    calls[0].resolve([]);
-    await flush();
-    await vi.advanceTimersByTimeAsync(POOL_RULES.retryDelayMs - 100);
-    expect(calls).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(200);
-    expect(calls).toHaveLength(2);
-    pool.setEnabled(false);
-    calls[1].resolve([]);
-    await vi.advanceTimersByTimeAsync(POOL_RULES.retryDelayMs * 3);
-    expect(calls).toHaveLength(2);
-  });
-
-  it('каждая неудача подряд ждёт вдвое дольше, до двух минут; первый успех сбрасывает паузу', async () => {
-    const { calls, generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate);
-    pool.setEnabled(true);
-    const waitFor = async (delay: number) => {
+    // Таймеров нет: попытку запускает следующий вопрос, если пауза уже прошла.
+    const waitFor = async (pause: number) => {
       const before = calls.length;
-      await vi.advanceTimersByTimeAsync(delay - 100);
+      await vi.advanceTimersByTimeAsync(pause - 100);
+      pool.next();
       expect(calls).toHaveLength(before);
       await vi.advanceTimersByTimeAsync(200);
+      pool.next();
       expect(calls).toHaveLength(before + 1);
     };
-    for (const delay of [12_000, 24_000, 48_000, 96_000, 120_000, 120_000]) {
+    for (const pause of [15_000, 30_000, 60_000, 120_000, 120_000]) {
       calls[calls.length - 1].resolve([]);
       await flush();
-      // Игрок отвечает дальше на резерве — повтор от этого не приходит раньше.
-      for (let i = 0; i < 3; i++) expect(pool.next().id.startsWith('reserve-')).toBe(true);
-      await waitFor(delay);
+      await waitFor(pause);
     }
-    // Пришло мало, но пришло: следующий недобор снова ждёт 12 секунд.
+    // Ответ без новых заданий — тоже неудача.
+    calls[calls.length - 1].resolve([pool.next()]);
+    await flush();
+    await waitFor(120_000);
+
+    // Пришло мало, но пришло: пауза сброшена, недобор запрашивается сразу, а неудача — снова 15 с.
     calls[calls.length - 1].resolve(batch(2));
     await flush();
     expect(pool.queued).toBe(2);
+    const before = calls.length;
+    pool.next();
+    expect(calls).toHaveLength(before + 1);
+    calls[calls.length - 1].resolve([]);
+    await flush();
     await waitFor(POOL_RULES.retryDelayMs);
-    pool.destroy();
   });
 
   it('вопрос с ошибкой возвращается в хвост и не повторяется сразу', async () => {
     const { calls, generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate);
+    const pool = poolOf(generate);
     pool.setEnabled(true);
     calls[0].resolve(batch(4));
     await flush();
@@ -162,7 +178,7 @@ describe('пул вопросов (правила Conveyor)', () => {
 
   it('повтор прямо за собой отбрасывается и из пакета', async () => {
     const { calls, generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate);
+    const pool = poolOf(generate);
     const shown = pool.next(true);
     pool.setEnabled(true);
     calls[0].resolve([{ ...shown, id: 'other' }, ...batch(3)]);
@@ -170,36 +186,66 @@ describe('пул вопросов (правила Conveyor)', () => {
     expect(pool.queued).toBe(3);
   });
 
-  it('узнавание и воспроизведение делят очередь; аудирование — своя; устаревший ответ не попадает в чужую', async () => {
+  it('смена темы: запрос уходит, когда выбор устоялся; пакет после смены темы ложится в свою очередь', async () => {
     const { calls, generate } = controlledGenerate();
-    const pool = new QuestionPool(settings, generate);
+    const pool = poolOf(generate);
     pool.setEnabled(true);
     calls[0].resolve(batch());
     await flush();
+    // Узнавание и воспроизведение делят очередь.
     pool.setSettings({ ...settings, mode: 'recall' });
-    expect(pool.queued).toBe(8);
-    expect(calls).toHaveLength(1);
+    expect(pool.queued).toBe(10);
 
+    // Щелчки по темам подряд: запрос один — по последней, через 0,7 с.
+    pool.setSettings({ ...settings, grammarTopic: 'Dativ' });
+    await vi.advanceTimersByTimeAsync(300);
     pool.setSettings({ ...settings, mode: 'audio' });
     expect(pool.poolKey).toBe('audio|A2|Alltag & Routinen');
     expect(pool.queued).toBe(0);
+    expect(pool.next().audioText).toBeTruthy();
+    await vi.advanceTimersByTimeAsync(POOL_RULES.settleMs - 10);
+    expect(calls).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(20);
     expect(calls).toHaveLength(2);
     expect(calls[1].request.mode).toBe('audio');
-    expect(pool.next().audioText).toBeTruthy();
 
-    // Ответ на запрос аудирования приходит после возврата к письменному режиму.
+    // Ответ на запрос аудирования приходит после возврата к письменному режиму: он оплачен
+    // и ложится в очередь аудирования, а не в чужую и не в корзину.
     pool.setSettings(settings);
-    expect(calls[1].signal.aborted).toBe(true);
+    expect(calls[1].signal.aborted).toBe(false);
     calls[1].resolve(batch());
     await flush();
-    expect(pool.queued).toBe(8);
+    expect(pool.queued).toBe(10);
     pool.setSettings({ ...settings, mode: 'audio' });
-    expect(pool.queued).toBe(0);
+    expect(pool.queued).toBe(10);
+  });
+
+  it('остаток и показанный вопрос переживают перезагрузку; резерв не сохраняется; снимок живёт сутки', async () => {
+    const storage = memoryStorage();
+    const { calls, generate } = controlledGenerate();
+    const first = new QuestionPool(settings, generate, Math.random, storage);
+    first.next(true);
+    expect(storage.data.get(POOL_STORAGE_KEY) ?? '').not.toMatch(/reserve-/);
+    first.setEnabled(true);
+    calls[0].resolve(batch());
+    await flush();
+    const shown = first.next();
+    expect(isGenerated(shown)).toBe(true);
+
+    // Новая страница: показанный, но не отвеченный вопрос и девять невыданных — на месте, без запроса.
+    const second = new QuestionPool(settings, generate, Math.random, storage);
+    expect(second.queued).toBe(10);
+    second.setEnabled(true);
+    expect(calls).toHaveLength(1);
+    expect(questionFingerprint(second.next(true))).toBe(questionFingerprint(shown));
+
+    vi.setSystemTime(Date.now() + POOL_RULES.snapshotTtlMs + 60_000);
+    expect(new QuestionPool(settings, generate, Math.random, storage).queued).toBe(0);
   });
 
   it('резерв не показывает один вопрос дважды подряд', () => {
     const { generate } = controlledGenerate();
-    const pool = new QuestionPool({ ...settings, level: 'A1' }, generate, Math.random);
+    const pool = poolOf(generate, { ...settings, level: 'A1' });
     let last = '';
     for (let i = 0; i < 200; i++) {
       const fingerprint = questionFingerprint(pool.next());

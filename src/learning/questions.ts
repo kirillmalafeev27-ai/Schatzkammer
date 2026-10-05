@@ -860,13 +860,8 @@ export function normalizeQuestion(candidate: unknown, sequence = 0): GameQuestio
   const translation = cleanText(source.translation ?? source.russianTranslation ?? source.ru, 360);
   const rule = cleanText(source.rule ?? source.explanation ?? source.rationale ?? source.grammarTopic, 360);
   const rawOptions = source.options ?? source.answers ?? source.choices;
-  if (
-    prompt.length < 4 ||
-    context.length < 2 ||
-    rule.length < 4 ||
-    !Array.isArray(rawOptions) ||
-    rawOptions.length !== 4
-  )
+  // Разбор необязателен: генератор «Шахты» его не пишет, и панель тогда просто его не показывает.
+  if (prompt.length < 4 || context.length < 2 || !Array.isArray(rawOptions) || rawOptions.length !== 4)
     return null;
 
   const options = rawOptions.map((option) => cleanText(option, 180));

@@ -1,10 +1,16 @@
-// Пул вопросов — правила Conveyor (use-question-pool) без React:
-// - своя очередь на каждый ключ `уровень | лексика | грамматика` (аудирование — `audio | уровень | лексика`);
-// - пакет из 8 заданий запрашивается, когда в очереди меньше 3; не вышло — повтор через 12 с,
-//   и каждая следующая неудача ждёт вдвое дольше, до двух минут (первый успех сбрасывает паузу);
-// - последние 80 формулировок помнятся, последние 60 уходят серверу в `exclude`;
-// - вопрос с ошибкой возвращается в хвост очереди, но не показывается два раза подряд;
-// - пока очередь пуста, без ожидания берётся встроенный резерв: сначала задания своей темы.
+// Пул вопросов — правила «Шахты» (QuizBankProvider, перенос QuestionBank из See Escape):
+// - пакет из 10 заданий запрашивается, когда в очереди меньше 3; к модели не обращаются, пока
+//   пул выключен — игрок не на выборе зала и не в зале;
+// - смена темы или уровня: запрос уходит, когда выбор устоялся (0,7 с), а не на каждый щелчок;
+// - после неудачи новый запрос не раньше чем через 15 с, каждая неудача подряд — вдвое дольше,
+//   до двух минут; первый успех сбрасывает паузу. Ответ без новых заданий — тоже неудача;
+// - последние 60 формулировок помнятся, последние 12 уходят серверу в `exclude`;
+// - невыданный остаток и показанный, но ещё не отвеченный вопрос хранятся в localStorage сутки:
+//   после перезагрузки страницы они отдаются без нового запроса.
+// Своё, как было: очередь на каждый ключ `уровень | лексика | грамматика` (аудирование —
+// `audio | уровень | лексика`), и пакет, пришедший после смены темы, ложится в очередь своей
+// темы, а не пропадает; вопрос с ошибкой возвращается в хвост очереди, но не показывается два
+// раза подряд; пока очередь пуста, без ожидания берётся встроенный резерв своей темы.
 
 import type { LearningSettings } from './settings.ts';
 import { learningPoolKey } from './settings.ts';
@@ -18,16 +24,19 @@ import {
 } from './questions.ts';
 
 export const POOL_RULES = {
-  batchSize: 8,
+  batchSize: 10,
   lowWaterMark: 3,
-  recentLimit: 80,
-  serverExcludeLimit: 60,
-  retryDelayMs: 12_000,
+  recentLimit: 60,
+  serverExcludeLimit: 12,
+  retryDelayMs: 15_000,
   // Недоступный, ограниченный или исчерпанный провайдер отвечает так же быстро, как здоровый,
   // и ровный повтор превращает сбой в капель платных попыток.
   retryDelayCeilingMs: 120_000,
-  requestTimeoutMs: 46_000,
+  settleMs: 700,
+  snapshotTtlMs: 24 * 60 * 60 * 1000,
 } as const;
+
+export const POOL_STORAGE_KEY = 'schatzkammer.quiz.pool.v1';
 
 export interface GenerateRequest {
   level: string;
@@ -41,8 +50,12 @@ export interface GenerateRequest {
 /** Запрос пакета; возвращает сырые записи — пул сам нормализует их и отсеивает повторы. */
 export type GenerateFn = (request: GenerateRequest, signal: AbortSignal) => Promise<unknown[]>;
 
+export type PoolStorage = Pick<Storage, 'getItem' | 'setItem'>;
+
 interface KeyState {
   queue: GameQuestion[];
+  /** Показанный сгенерированный вопрос, пока на него не ответили: он тоже переживает перезагрузку. */
+  current: GameQuestion | null;
   recent: string[];
   recentFingerprints: string[];
   reserve: GameQuestion[];
@@ -77,16 +90,50 @@ function reserveIndexes(
   return [...shuffled(preferred, random), ...shuffled(supplemental, random)];
 }
 
+function defaultStorage(): PoolStorage | null {
+  try {
+    return (globalThis as { localStorage?: PoolStorage }).localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Снимок прошлой сессии: очереди по ключам, если ему меньше суток. */
+function loadSnapshot(storage: PoolStorage | null): Map<string, GameQuestion[]> {
+  const restored = new Map<string, GameQuestion[]>();
+  if (!storage) return restored;
+  try {
+    const saved = JSON.parse(storage.getItem(POOL_STORAGE_KEY) || '{}') as {
+      savedAt?: number;
+      pools?: Record<string, unknown>;
+    };
+    if (Date.now() - Number(saved.savedAt || 0) > POOL_RULES.snapshotTtlMs) return restored;
+    for (const [key, records] of Object.entries(saved.pools ?? {})) {
+      if (!Array.isArray(records)) continue;
+      const questions = records
+        .map((record, index) => normalizeQuestion(record, index))
+        .filter((question): question is GameQuestion => question !== null);
+      if (questions.length) restored.set(key, questions);
+    }
+  } catch {
+    // Испорченный снимок — играем без него.
+  }
+  return restored;
+}
+
 export class QuestionPool {
   private readonly states = new Map<string, KeyState>();
+  private readonly restored: Map<string, GameQuestion[]>;
   private settings!: LearningSettings;
   private key = '';
   private state!: KeyState;
   private enabled = false;
   private inFlight: Promise<void> | null = null;
   private abort: AbortController | null = null;
-  private retryTimer: ReturnType<typeof setTimeout> | null = null;
+  private retryAt = 0;
   private retryDelay: number = POOL_RULES.retryDelayMs;
+  /** Тему и уровень часто меняют подряд: запрос уходит, когда выбор устоялся. */
+  private settleTimer: ReturnType<typeof setTimeout> | null = null;
   private epoch = 0;
   private destroyed = false;
   /** Номер текущего вопроса в раунде (с 1). */
@@ -96,8 +143,10 @@ export class QuestionPool {
     settings: LearningSettings,
     private readonly generate: GenerateFn,
     private readonly random: () => number = Math.random,
+    private readonly storage: PoolStorage | null = defaultStorage(),
   ) {
-    this.setSettings(settings);
+    this.restored = loadSnapshot(storage);
+    this.select(settings);
   }
 
   get poolKey(): string {
@@ -112,59 +161,33 @@ export class QuestionPool {
     return this.inFlight != null;
   }
 
-  /** Смена темы или режима: прежняя очередь сохраняется, запрос по ней отменяется. */
+  /** Смена темы или режима: прежняя очередь сохраняется, запрос по новой уходит через 0,7 с. */
   setSettings(settings: LearningSettings): void {
-    this.settings = { ...settings };
-    const key = learningPoolKey(settings);
-    if (key === this.key) return;
-    this.abort?.abort();
-    this.abort = null;
-    this.epoch += 1;
-    this.inFlight = null;
-    this.clearRetry();
-    this.key = key;
-    let state = this.states.get(key);
-    if (!state) {
-      const reserve = fallbackQuestionsFor(settings);
-      state = {
-        queue: [],
-        recent: [],
-        recentFingerprints: [],
-        reserve,
-        reserveOrder: reserveIndexes(reserve, settings, this.random),
-        reserveCursor: 0,
-        lastFingerprint: '',
-      };
-      this.states.set(key, state);
-    }
-    this.state = state;
-    this.questionNumber = 0;
-    if (this.enabled && state.queue.length < POOL_RULES.lowWaterMark) void this.refill();
+    if (!this.select(settings)) return;
+    if (this.settleTimer) clearTimeout(this.settleTimer);
+    this.settleTimer = setTimeout(() => {
+      this.settleTimer = null;
+      void this.refill();
+    }, POOL_RULES.settleMs);
   }
 
   /** Пополнение идёт, только пока игрок рядом с игрой: в залах и на выборе зала. */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    if (!enabled) {
-      this.clearRetry();
-      return;
-    }
-    if (this.state.queue.length < POOL_RULES.lowWaterMark) void this.refill();
+    if (enabled) void this.refill();
   }
 
   refill(): Promise<void> {
-    if (!this.enabled || this.destroyed) return Promise.resolve();
+    if (!this.enabled || this.destroyed || this.settleTimer) return Promise.resolve();
     if (this.state.queue.length >= POOL_RULES.lowWaterMark) return Promise.resolve();
     if (this.inFlight) return this.inFlight;
-    const key = this.key;
+    if (Date.now() < this.retryAt) return Promise.resolve();
     const epoch = this.epoch;
     const state = this.state;
     const settings = this.settings;
     const controller = new AbortController();
     this.abort = controller;
-    const timeout = setTimeout(() => controller.abort(), POOL_RULES.requestTimeoutMs);
-    const isCurrent = () => !this.destroyed && epoch === this.epoch && key === this.key;
-    const task = this.generate(
+    const task: Promise<void> = this.generate(
       {
         level: settings.level,
         mode: settings.mode,
@@ -176,7 +199,7 @@ export class QuestionPool {
       controller.signal,
     )
       .then((records) => {
-        if (!isCurrent()) return;
+        if (this.destroyed) return;
         const known = new Set([
           state.lastFingerprint,
           ...state.recentFingerprints,
@@ -191,24 +214,22 @@ export class QuestionPool {
           known.add(fingerprint);
           accepted.push(normalized);
         }
-        if (!accepted.length) return;
-        this.retryDelay = POOL_RULES.retryDelayMs;
+        // Ответ без новых заданий — тоже неудача: иначе каждый следующий вопрос запрашивал бы снова.
+        if (!accepted.length) throw new Error('no new questions');
+        // Пакет оплачен, поэтому ложится в очередь своей темы, даже если игрок её уже сменил.
         state.queue.push(...shuffled(accepted, this.random));
+        this.retryAt = 0;
+        this.retryDelay = POOL_RULES.retryDelayMs;
+        this.persist();
       })
-      .catch(() => {})
+      .catch(() => {
+        if (this.destroyed || epoch !== this.epoch) return;
+        this.retryAt = Date.now() + this.retryDelay;
+        this.retryDelay = Math.min(this.retryDelay * 2, POOL_RULES.retryDelayCeilingMs);
+      })
       .finally(() => {
-        clearTimeout(timeout);
         if (this.abort === controller) this.abort = null;
-        if (epoch === this.epoch) this.inFlight = null;
-        if (!isCurrent()) return;
-        if (this.enabled && state.queue.length < POOL_RULES.lowWaterMark && !this.retryTimer) {
-          const delay = this.retryDelay;
-          this.retryDelay = Math.min(delay * 2, POOL_RULES.retryDelayCeilingMs);
-          this.retryTimer = setTimeout(() => {
-            this.retryTimer = null;
-            void this.refill();
-          }, delay);
-        }
+        if (this.inFlight === task) this.inFlight = null;
       });
     this.inFlight = task;
     return task;
@@ -225,8 +246,9 @@ export class QuestionPool {
       const alternateIndex = state.queue.findIndex(
         (candidate) => questionFingerprint(candidate) !== state.lastFingerprint,
       );
-      next = alternateIndex >= 0 ? state.queue.splice(alternateIndex, 1)[0] : this.nextReserve();
+      next = alternateIndex >= 0 ? state.queue.splice(alternateIndex, 1)[0] : undefined;
     }
+    state.current = next ?? null;
     next ??= this.nextReserve();
     const fingerprint = questionFingerprint(next);
     state.lastFingerprint = fingerprint;
@@ -239,9 +261,8 @@ export class QuestionPool {
       state.recentFingerprints.splice(0, state.recentFingerprints.length - POOL_RULES.recentLimit);
     }
     this.questionNumber = restart ? 1 : this.questionNumber + 1;
-    // Пока ждёт повтор после неудачи, показ вопроса его не обгоняет: иначе каждый ответ игрока
-    // был бы новой попыткой и растущая пауза ничего бы не сдерживала.
-    if (state.queue.length < POOL_RULES.lowWaterMark && !this.retryTimer) void this.refill();
+    this.persist();
+    if (state.queue.length < POOL_RULES.lowWaterMark) void this.refill();
     return shuffleQuestion(next, this.random);
   }
 
@@ -250,6 +271,7 @@ export class QuestionPool {
     const fingerprint = questionFingerprint(released);
     if (!this.state.queue.some((queued) => questionFingerprint(queued) === fingerprint)) {
       this.state.queue.push(released);
+      this.persist();
     }
   }
 
@@ -257,7 +279,60 @@ export class QuestionPool {
     this.destroyed = true;
     this.abort?.abort();
     this.abort = null;
-    this.clearRetry();
+    if (this.settleTimer) clearTimeout(this.settleTimer);
+    this.settleTimer = null;
+  }
+
+  /** Переключиться на очередь ключа; false — ключ не изменился. */
+  private select(settings: LearningSettings): boolean {
+    this.settings = { ...settings };
+    const key = learningPoolKey(settings);
+    if (key === this.key) return false;
+    // Прежний запрос не отменяется: его пакет ляжет в очередь своей темы.
+    this.epoch += 1;
+    this.inFlight = null;
+    this.retryAt = 0;
+    this.key = key;
+    let state = this.states.get(key);
+    if (!state) {
+      const reserve = fallbackQuestionsFor(settings);
+      state = {
+        queue: this.restored.get(key) ?? [],
+        current: null,
+        recent: [],
+        recentFingerprints: [],
+        reserve,
+        reserveOrder: reserveIndexes(reserve, settings, this.random),
+        reserveCursor: 0,
+        lastFingerprint: '',
+      };
+      this.restored.delete(key);
+      this.states.set(key, state);
+    }
+    this.state = state;
+    this.questionNumber = 0;
+    return true;
+  }
+
+  /** Сохранить сгенерированный остаток всех тем (saveRestartPoolSnapshot в See Escape). */
+  private persist(): void {
+    if (!this.storage) return;
+    const pools: Record<string, GameQuestion[]> = Object.fromEntries(this.restored);
+    for (const [key, state] of this.states) {
+      const seen = new Set<string>();
+      const questions = [...(state.current ? [state.current] : []), ...state.queue].filter((question) => {
+        const fingerprint = questionFingerprint(question);
+        if (seen.has(fingerprint)) return false;
+        seen.add(fingerprint);
+        return true;
+      });
+      if (questions.length) pools[key] = questions;
+    }
+    try {
+      this.storage.setItem(POOL_STORAGE_KEY, JSON.stringify({ savedAt: Date.now(), pools }));
+    } catch {
+      // Приватный режим или квота — пул просто не переживёт перезагрузку.
+    }
   }
 
   private nextReserve(): GameQuestion {
@@ -272,10 +347,5 @@ export class QuestionPool {
       next = state.reserve[state.reserveOrder[state.reserveCursor++]];
     }
     return next;
-  }
-
-  private clearRetry(): void {
-    if (this.retryTimer) clearTimeout(this.retryTimer);
-    this.retryTimer = null;
   }
 }
