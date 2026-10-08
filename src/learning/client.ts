@@ -31,6 +31,21 @@ function isWortstellungTopic(topic: string): boolean {
 }
 
 /**
+ * Формат сгенерированного задания по его виду — так генератор размечает смешанные типы
+ * (TOPIC_TASK_MIX в quiz-generation.cjs): «→ Perfekt» — преобразование, «(1 Fehler)» —
+ * исправление ошибки, части через « / » — сборка предложения, пропуски — один или два.
+ */
+export function generatedFormatOf(display: string): TaskFormatId {
+  const gaps = gapCount(display);
+  if (gaps >= 2) return 'mehrfachluecke';
+  if (gaps === 1) return 'luecke';
+  if (display.includes('→')) return 'umformung';
+  if (/\(\s*1\s+Fehler\s*\)\s*$/iu.test(display)) return 'fehlerkorrektur';
+  if (display.split(' / ').length >= 3) return 'wortstellung';
+  return 'satzvarianten';
+}
+
+/**
  * Задание генератора («text / display / options / correct» или аудирование с audioText) в виде
  * записи игры. Перевода и разбора генератор не пишет — панель их просто не показывает.
  * Инструкция — по-русски, по формату, который видно из самого задания.
@@ -58,15 +73,7 @@ export function fromGenerated(raw: unknown, request: GenerateRequest): Record<st
     };
   }
   const display = typeof source.display === 'string' ? source.display : '';
-  const gaps = gapCount(display);
-  const format: TaskFormatId =
-    gaps >= 2
-      ? 'mehrfachluecke'
-      : gaps === 1
-        ? 'luecke'
-        : isWortstellungTopic(request.grammarTopic) && display.includes(' / ')
-          ? 'wortstellung'
-          : 'satzvarianten';
+  const format = generatedFormatOf(display);
   return {
     ...common,
     prompt: TASK_FORMATS[format].instruction,

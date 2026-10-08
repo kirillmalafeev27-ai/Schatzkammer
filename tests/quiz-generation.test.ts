@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiHandler } from '../server/api';
-import { API_PATHS, fromGenerated, requestQuestions } from '../src/learning/client';
+import { API_PATHS, fromGenerated, generatedFormatOf, requestQuestions } from '../src/learning/client';
 import { AUDIO_DISPLAY_CONTEXT, EXERCISE_FORMATS } from '../src/learning/formats';
 import { normalizeQuestion } from '../src/learning/questions';
 import { TASK_FORMATS } from '../src/learning/task-formats';
@@ -26,6 +26,50 @@ function aufgaben(count: number, tag: string) {
   }
   return `AUFGABEN\n${tasks.join('\n\n')}\n\nLOESUNGEN\n${keys.join('\n')}`;
 }
+
+/** Ответ модели на Perfekt — по заданию каждого из пяти типов TOPIC_TASK_MIX. */
+const PERFEKT_REPLY = `AUFGABEN
+1. Anweisung: Setze das Partizip II ein.
+Satz: Wir haben gestern bis acht Uhr ___. (arbeiten)
+A) gearbeitet
+B) arbeitet
+C) geärbeitet
+D) gearbeiten
+
+2. Anweisung: Ergaenze beide Luecken.
+Satz: Gestern ___ ich um sechs Uhr ___. (aufstehen)
+A) habe – aufgestanden
+B) bin – aufgestanden
+C) bin – aufgesteht
+D) habe – aufgesteht
+
+3. Anweisung: Setze den Satz ins Perfekt.
+Satz: Der Bus fährt um acht ab. → Perfekt
+A) Der Bus hat um acht abgefahren.
+B) Der Bus ist um acht abgefahren.
+C) Der Bus ist um acht abgefährt.
+D) Der Bus ist abgefahren um acht.
+
+4. Anweisung: Waehle die korrigierte Fassung.
+Satz: Sie hat am Sonntag nach Hause gegangen. (1 Fehler)
+A) Sie hat am Sonntag nach Hause gegangen.
+B) Sie ist am Sonntag nach Hause gegeht.
+C) Sie ist am Sonntag nach Hause gegangen.
+D) Sie hat am Sonntag nach Hause gegeht.
+
+5. Anweisung: Bilde den Satz im Perfekt.
+Woerter: eine Pizza / gestern / gegessen / habe / ich
+A) Gestern ich habe eine Pizza gegessen.
+B) Gestern habe ich gegessen eine Pizza.
+C) Gestern habe ich eine Pizza gegessen.
+D) Gestern gegessen habe ich eine Pizza.
+
+LOESUNGEN
+1: A = gearbeitet
+2: B = bin – aufgestanden
+3: B = Der Bus ist um acht abgefahren.
+4: C = Sie ist am Sonntag nach Hause gegangen.
+5: C = Gestern habe ich eine Pizza gegessen.`;
 
 describe('генерация — модуль «Шахты» (quiz-generation.cjs) за API «Сокровищницы»', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
@@ -76,6 +120,58 @@ describe('генерация — модуль «Шахты» (quiz-generation.cj
     expect(prompt).toMatch(/"Ich helfe ___ Nachbarin\."/);
     // Цена вызова: запрос «Шахты» в шесть раз короче прежнего запроса Druckmaschine (≈16 000 знаков).
     expect(prompt.length).toBeLessThan(4_000);
+  });
+
+  it('Perfekt: в запросе смесь пяти типов вместо «одна Lücke»; каждый тип доходит до игры своим форматом', async () => {
+    fetchMock.mockImplementation(async () =>
+      Response.json({ choices: [{ message: { content: PERFEKT_REPLY } }] }),
+    );
+    const api = createApiHandler();
+    const request: GenerateRequest = {
+      level: 'A2',
+      mode: 'recognition',
+      lexicalTopic: 'Freizeit & Hobbys',
+      grammarTopic: 'Perfekt',
+      count: 10,
+      exclude: [],
+    };
+    const response = (await api(post('/api/generate-questions', { ...request, isWortstellung: false })))!;
+    const { questions } = await response.json();
+
+    const prompt: string = JSON.parse(fetchMock.mock.calls[0][1].body as string).messages[0].content;
+    expect(prompt).toMatch(/Aufgabentypen fuer "Perfekt"/);
+    expect(prompt).toMatch(/Hoechstens 1 Aufgabe, in der nur haben\/sein gewaehlt wird/);
+    expect(prompt).not.toMatch(/genau einer Luecke/);
+    // Смесь удлиняет запрос по Perfekt примерно на 1 600 знаков — он всё ещё втрое короче прежнего.
+    expect(prompt.length).toBeLessThan(5_000);
+
+    const games = questions.map((raw: unknown) => normalizeQuestion(fromGenerated(raw, request))!);
+    expect(games.map((q: { format?: string }) => q.format)).toEqual([
+      'luecke',
+      'mehrfachluecke',
+      'umformung',
+      'fehlerkorrektur',
+      'wortstellung',
+    ]);
+    for (const q of games)
+      expect(q.prompt).toBe(TASK_FORMATS[q.format as keyof typeof TASK_FORMATS].instruction);
+    expect(games[1].options[games[1].correct]).toBe('bin – aufgestanden');
+    expect(games[4].options[games[4].correct]).toBe('Gestern habe ich eine Pizza gegessen.');
+  });
+
+  it('у других тем запрос прежний: одна Lücke', async () => {
+    const api = createApiHandler();
+    await api(
+      post('/api/generate-questions', {
+        level: 'A2',
+        lexicalTopic: 'Freizeit & Hobbys',
+        grammarTopic: 'Akkusativ',
+        count: 10,
+      }),
+    );
+    const prompt: string = JSON.parse(fetchMock.mock.calls[0][1].body as string).messages[0].content;
+    expect(prompt).toMatch(/genau einer Luecke/);
+    expect(prompt).not.toMatch(/Aufgabentypen/);
   });
 
   it('аудирование — тот же модуль, задания с фразой и русскими вариантами', async () => {
@@ -160,6 +256,8 @@ describe('клиент: запросы и задания как у QuizBankProvi
       ['Ich bleibe zu Hause, weil ich krank ___.', 'luecke'],
       ['Der Zug ___ um 9 Uhr ___.', 'mehrfachluecke'],
       ['morgen / ich / fahre / nach Berlin', 'wortstellung'],
+      ['Ich kaufe ein Brot. → Perfekt', 'umformung'],
+      ['Er hat nach Hause gegangen. (1 Fehler)', 'fehlerkorrektur'],
       ['Welcher Satz ist richtig?', 'satzvarianten'],
     ];
     for (const [display, format] of cases) {
@@ -197,5 +295,8 @@ describe('клиент: запросы и задания как у QuizBankProvi
       rule: 'Ich hole das Rezept ab.',
     });
     expect(fromGenerated({ display: 'x', options }, request)).toBeNull();
+    // Дробь в обычном предложении — ещё не сборка предложения.
+    expect(generatedFormatOf('Die Fahrt kostet 3 / 4 Euro ___.')).toBe('luecke');
+    expect(generatedFormatOf('Er sagt ja / nein.')).toBe('satzvarianten');
   });
 });

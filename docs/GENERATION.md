@@ -9,8 +9,10 @@
 > Система Druckmaschine осталась для **встроенного резерва**: резервные задания написаны в её
 > девяти форматах, и тест прогоняет каждое через проверку `exercise-validation.ts`. Форматы задают и
 > русскую инструкцию над сгенерированным заданием: игра определяет формат по виду задания
-> (один пропуск — `luecke`, два — `mehrfachluecke`, части через `/` — `wortstellung`, иначе —
-> `satzvarianten`).
+> (один пропуск — `luecke`, два — `mehrfachluecke`, «→ Perfekt» — `umformung`, «(1 Fehler)» —
+> `fehlerkorrektur`, части через `/` — `wortstellung`, иначе — `satzvarianten`). Такую разметку
+> генератор пишет для тем из `TOPIC_TASK_MIX` — пока это Perfekt, где одна Lücke оставляла только
+> выбор haben/sein.
 
 Ниже — устройство системы Druckmaschine (ветка `happy-shannon`), по которой написан и проверяется резерв.
 
